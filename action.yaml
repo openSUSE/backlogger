@@ -1,0 +1,50 @@
+---
+name: 'Backlog Limits Checker'
+description: 'Produce a static webpage with an overview of your backlog'
+branding:
+  icon: 'activity'
+  color: 'orange'
+
+inputs:
+  config:
+    description: The configuration file
+    required: false
+    default: 'queries.yaml'
+  folder:
+    description: Output folder for HTML files
+    required: false
+    default: 'gh-pages'
+  redmine_api_key:
+    description: The Redmine API key
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v3
+      with:
+        repository: kalikiana/backlogger
+        path: backlogger
+    - uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r backlogger/requirements.txt
+      shell: bash
+    - run: sudo apt-get install -y kramdown
+      shell: bash
+    - name: Render Markdown from configured backlog queries
+      run: python backlogger/backlogger.py ${{ inputs.config }}
+      env:
+        REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}
+      shell: bash
+    - name: Render HTML
+      run: |
+          mkdir -p ${{ inputs.folder }}
+          cd ${{ inputs.folder }}
+          cat ../backlogger/head.html >index.html
+          kramdown ../index.md >>index.html
+          sed s@GITHUB_REPOSITORY@${{ github.repository }}@g ../backlogger/foot.html >>index.html
+      shell: bash

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import sys
 import json
@@ -11,53 +12,60 @@ import yaml
 result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
 
 # Initialize a blank md file to replace the current README
-def initialize_md():
-    with open("index.md", "a") as md:
+def initialize_md(data):
+    with open('index.md', 'w') as md:
         md.write("# Backlog Status\n\n")
-        md.write("**Latest Run:** " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " GMT\n")
+        md.write("**Latest Run:** " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " UTC\n")
         md.write("*(Please refresh to see latest results)*\n\n")
         md.write("Backlog Query | Number of Issues | Limits | Status\n--- | --- | --- | ---\n")
 
 
+def get_link(conf):
+    return data['web'] + '?' + conf['query']
+
+
 # Append individual results to md file
 def results_to_md(conf, number, status):
-    mdlink = '[' + conf['title'] + '](' + conf['link'] + ')'
+    mdlink = '[' + conf['title'] + '](' + get_link(conf) + ')'
     lessthan = conf['max'] + 1
     limits = '<' + str(lessthan)
     if 'min' in conf:
         limits += ', >' + str(conf['min'] - 1)
-    with open("index.md", "a") as md:
+    with open('index.md', 'a') as md:
         md.write(mdlink + " | " + str(number) + " | " + limits + " | " + status + "\n")
 
 
 def get_json(conf):
-    key = os.environ['key']
-    answer = requests.get(conf['url'] + "&key=" + key)
+    try:
+        key = os.environ['REDMINE_API_KEY']
+    except KeyError:
+        exit('REDMINE_API_KEY is required to be set')
+    answer = requests.get(data['api'] + '?' + conf['query'] + "&key=" + key)
     return json.loads(answer.content)
 
 
 def list_issues(conf, root):
     try:
         for poo in root['issues']:
-            print("https://progress.opensuse.org/issues/" + str(poo['id']))
+            print(data['web'] + '/' + str(poo['id']))
     except Exception:
         print("There was an error retrieving the issues " + conf['title'])
-        print("Please check " + conf['link'])
+        print("Please check " + get_link(conf))
     else:
         issue_count = int(root["total_count"])
         if issue_count > len(root['issues']):
-            print("there are more issues, check " + conf['link'])
+            print("there are more issues, check " + get_link(conf))
 
 
 def failure_more(conf):
     print(conf['title'] + " has more than " + str(conf['max']) + " tickets!")
-    print("Please check " + conf['link'])
+    print("Please check " + get_link(conf))
     return False
 
 
 def failure_less(conf):
     print(conf['title'] + " has less than " + str(conf['min']) + " tickets!")
-    print("Please check " + conf['link'])
+    print("Please check " + get_link(conf))
     return False
 
 
@@ -74,35 +82,16 @@ def check_backlog(conf):
     return (res, issue_count)
 
 
-def check_zero(conf):
-    root = get_json(conf)
-    issue_count = int(root["total_count"])
-    if issue_count > conf['max']:
-        res = False
-        print("There are " + conf['title'] + " tickets!")
-        list_issues(conf, root)
-    else:
-        res = True
-        print("There are no " + conf['title'] + " tickets, all good!")
-    return (res, issue_count)
-
-
 def check_query(name):
-    filename = os.environ.get('config', 'queries.yaml')
+    for conf in data['queries']:
+        res = check_backlog(conf)
+        results_to_md(conf, res[1], result_icons["pass"] if res[0] else result_icons["fail"])
+
+filename = sys.argv[1] if len(sys.argv) > 1 else 'queries.yaml'
+try:
     with open(filename, 'r') as config:
         data = yaml.safe_load(config)
-    conf = data['queries'][name]
-    if conf['type'] == 'backlog':
-        res = check_backlog(conf)
-    else:
-        res = check_zero(conf)
-    if res[0] is False:
-        results_to_md(conf, res[1], result_icons["fail"])
-        sys.exit(1)
-    results_to_md(conf, res[1], result_icons["pass"])
-
-
-if "fun" not in os.environ:
-    initialize_md()
-else:
-    check_query(os.environ["fun"])
+        initialize_md(data)
+        check_query(data)
+except FileNotFoundError:
+    sys.exit('Configuration file {} not found'.format(filename))

@@ -1,0 +1,22 @@
+---
+name: Backlog Limits Checker
+on:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  backlogger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run the action implemented in this repo
+        uses: ./
+        with:
+          config: queries.yaml
+          redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: gh-pages
+          clean-exclude: pr-preview
