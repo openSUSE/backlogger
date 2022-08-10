@@ -1,5 +1,7 @@
 api: https://progress.opensuse.org/issues.json
 web: https://progress.opensuse.org/issues
+team: Example
+url: http://example.com
 queries:
   - title: Workable Backlog
     query: query_id=478

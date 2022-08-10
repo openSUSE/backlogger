@@ -15,6 +15,7 @@ result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
 def initialize_md(data):
     with open('index.md', 'w') as md:
         md.write("# Backlog Status\n\n")
+        md.write("This is the dashboard for [{}]({}).\n".format(data['team'], data['url']))
         md.write("**Latest Run:** " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " UTC\n")
         md.write("*(Please refresh to see latest results)*\n\n")
         md.write("Backlog Query | Number of Issues | Limits | Status\n--- | --- | --- | ---\n")
@@ -44,13 +45,34 @@ def get_json(conf):
     return json.loads(answer.content)
 
 
+def json_rest(method, poo, rest):
+    text = json.dumps(rest)
+    headers = {
+      'User-Agent': 'backlogger ({})'.format(data['url']),
+      'Content-Type': 'application/json',
+      'X-Redmine-API-Key': os.environ['REDMINE_API_KEY'],
+    }
+    r = requests.request(method, '{}/{}.json'.format(data['web'], poo['id']), data=text, headers=headers)
+    r.raise_for_status()
+    return r.json() if r.text else None
+
+
+def issue_reminder(poo):
+    priority = poo['priority']['name']
+    msg = 'This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority.'.format(priority=priority, url=data['url'])
+    print(msg)
+    if '--reminder-comment-on-issues' in sys.argv:
+        json_rest('PUT', poo, {'issue': {'notes': msg}})
+
+
 def list_issues(conf, root):
     try:
         for poo in root['issues']:
             print(data['web'] + '/' + str(poo['id']))
-    except Exception:
+            if 'update_on' in conf['query'] or 'due_date' in conf['query']:
+                issue_reminder(poo)
+    except KeyError:
         print("There was an error retrieving the issues " + conf['title'])
-        print("Please check " + get_link(conf))
     else:
         issue_count = int(root["total_count"])
         if issue_count > len(root['issues']):
@@ -59,18 +81,17 @@ def list_issues(conf, root):
 
 def failure_more(conf):
     print(conf['title'] + " has more than " + str(conf['max']) + " tickets!")
-    print("Please check " + get_link(conf))
     return False
 
 
 def failure_less(conf):
     print(conf['title'] + " has less than " + str(conf['min']) + " tickets!")
-    print("Please check " + get_link(conf))
     return False
 
 
 def check_backlog(conf):
     root = get_json(conf)
+    list_issues(conf, root)
     issue_count = int(root["total_count"])
     if issue_count > conf['max']:
         res = failure_more(conf)
@@ -79,6 +100,8 @@ def check_backlog(conf):
     else:
         res = True
         print(conf['title'] + " length is " + str(issue_count) + ", all good!")
+    if not res:
+        print("Please check " + get_link(conf))
     return (res, issue_count)
 
 
