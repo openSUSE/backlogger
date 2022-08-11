@@ -4,6 +4,7 @@ import sys
 import json
 from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
+import markdown
 import requests
 import yaml
 
@@ -93,5 +94,17 @@ try:
         data = yaml.safe_load(config)
         initialize_md(data)
         check_query(data)
+        if 'GITHUB_REPOSITORY' in os.environ:
+            with open('index.md', 'a') as md:
+                md.write("\n---\n[{repo}](https://github.com/{repo}) on GitHub</a>".format(
+                    repo=os.environ['GITHUB_REPOSITORY']))
+    with open('index.html', 'w') as html:
+        with open('head.html', 'r') as head:
+            html.write(head.read())
+        with open('index.md', 'r') as md:
+            html.write(markdown.markdown(md.read(), extensions=['tables']))
+        with open('foot.html', 'r') as foot:
+            html.write(foot.read())
+
 except FileNotFoundError:
     sys.exit('Configuration file {} not found'.format(filename))
