@@ -65,7 +65,7 @@ def list_issues(conf, root):
     try:
         for poo in root['issues']:
             print(data['web'] + '/' + str(poo['id']))
-            if 'update_on' in conf['query']:
+            if 'updated_on' in conf['query']:
                 issue_reminder(poo)
     except KeyError:
         print("There was an error retrieving the issues " + conf['title'])
@@ -106,11 +106,12 @@ def check_query(name):
         res = check_backlog(conf)
         results_to_md(conf, res[1], result_icons["pass"] if res[0] else result_icons["fail"])
 
-filename = sys.argv[1] if len(sys.argv) > 1 else 'queries.yaml'
-try:
-    with open(filename, 'r') as config:
-        data = yaml.safe_load(config)
-        initialize_md(data)
-        check_query(data)
-except FileNotFoundError:
-    sys.exit('Configuration file {} not found'.format(filename))
+if __name__ == '__main__':
+    filename = sys.argv[1] if len(sys.argv) > 1 else 'queries.yaml'
+    try:
+        with open(filename, 'r') as config:
+            data = yaml.safe_load(config)
+            initialize_md(data)
+            check_query(data)
+    except FileNotFoundError:
+        sys.exit('Configuration file {} not found'.format(filename))
