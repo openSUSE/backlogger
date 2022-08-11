@@ -33,18 +33,11 @@ runs:
         python -m pip install --upgrade pip
         pip install -r backlogger/requirements.txt
       shell: bash
-    - run: sudo apt-get install -y kramdown
-      shell: bash
-    - name: Render Markdown from configured backlog queries
-      run: python backlogger/backlogger.py ${{ inputs.config }}
-      env:
-        REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}
-      shell: bash
-    - name: Render HTML
+    - name: Render HTML / Markdown from configured backlog queries
       run: |
           mkdir -p ${{ inputs.folder }}
           cd ${{ inputs.folder }}
-          cat ../backlogger/head.html >index.html
-          kramdown ../index.md >>index.html
-          sed s@GITHUB_REPOSITORY@${{ github.repository }}@g ../backlogger/foot.html >>index.html
+          python backlogger/backlogger.py ../${{ inputs.config }}
+      env:
+        REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}
       shell: bash
