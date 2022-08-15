@@ -10,6 +10,12 @@ Have a look at the [demo hosted on GitHub Pages](https://kalikiana.github.io/bac
 
 By default a file *queries.yaml* is expected to contain the queries and limits for your project.
 
+## args
+
+Additional arguments affecting the behavior of the script:
+
+`--reminder-comment-on-issues` can be added here to enable automatic reminder comments. This is **not** enabled by default because it's designed to be used in scheduled runs. Manual execution and previews of changed queries are not expected to have side-effects.
+
 ## folder
 
 The output folder for the generated HTML. By default this is `gh-pages`.
@@ -33,6 +39,7 @@ jobs:
       - uses: actions/checkout@v2
       - uses: kalikiana/backlogger@main
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
+          args: --reminder-comment-on-issues
       - uses: JamesIves/github-pages-deploy-action@v4
         with:
           folder: gh-pages
@@ -52,6 +59,7 @@ on:
       - closed
 permissions:
   contents: write
+  pull-requests: write
 jobs:
   backlogger:
     runs-on: ubuntu-latest

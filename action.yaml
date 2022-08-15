@@ -10,6 +10,10 @@ inputs:
     description: The configuration file
     required: false
     default: 'queries.yaml'
+  args:
+    description: Additional arguments to the script
+    required: false
+    default: ''
   folder:
     description: Output folder for HTML files
     required: false
@@ -36,7 +40,7 @@ runs:
     - run: sudo apt-get install -y kramdown
       shell: bash
     - name: Render Markdown from configured backlog queries
-      run: python backlogger/backlogger.py ${{ inputs.config }}
+      run: python backlogger/backlogger.py ${{ inputs.config }} ${{ inputs.args }}
       env:
         REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}
       shell: bash
