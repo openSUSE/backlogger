@@ -36,23 +36,18 @@ def results_to_md(conf, number, status):
         md.write(mdlink + " | " + str(number) + " | " + limits + " | " + status + "\n")
 
 
-def get_json(conf):
+def json_rest(method, url, rest=None):
+    text = json.dumps(rest)
     try:
         key = os.environ['REDMINE_API_KEY']
     except KeyError:
         exit('REDMINE_API_KEY is required to be set')
-    answer = requests.get(data['api'] + '?' + conf['query'] + "&key=" + key)
-    return json.loads(answer.content)
-
-
-def json_rest(method, poo, rest):
-    text = json.dumps(rest)
     headers = {
       'User-Agent': 'backlogger ({})'.format(data['url']),
       'Content-Type': 'application/json',
-      'X-Redmine-API-Key': os.environ['REDMINE_API_KEY'],
+      'X-Redmine-API-Key': key,
     }
-    r = requests.request(method, '{}/{}.json'.format(data['web'], poo['id']), data=text, headers=headers)
+    r = requests.request(method, url, data=text, headers=headers)
     r.raise_for_status()
     return r.json() if r.text else None
 
@@ -62,7 +57,8 @@ def issue_reminder(poo):
     msg = 'This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority.'.format(priority=priority, url=data['url'])
     print(msg)
     if '--reminder-comment-on-issues' in sys.argv:
-        json_rest('PUT', poo, {'issue': {'notes': msg}})
+        url = '{}/{}.json'.format(data['web'], poo['id'])
+        json_rest('PUT', url, {'issue': {'notes': msg}})
 
 
 def list_issues(conf, root):
@@ -90,7 +86,7 @@ def failure_less(conf):
 
 
 def check_backlog(conf):
-    root = get_json(conf)
+    root = json_rest('GET', data['api'] + '?' + conf['query'])
     list_issues(conf, root)
     issue_count = int(root["total_count"])
     if issue_count > conf['max']:
