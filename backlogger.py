@@ -69,7 +69,7 @@ def list_issues(conf, root):
     try:
         for poo in root['issues']:
             print(data['web'] + '/' + str(poo['id']))
-            if 'update_on' in conf['query'] or 'due_date' in conf['query']:
+            if 'update_on' in conf['query']:
                 issue_reminder(poo)
     except KeyError:
         print("There was an error retrieving the issues " + conf['title'])
