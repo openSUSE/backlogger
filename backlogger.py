@@ -101,7 +101,7 @@ def check_backlog(conf):
     return (res, issue_count)
 
 
-def check_query(name):
+def check_query(data):
     for conf in data['queries']:
         res = check_backlog(conf)
         results_to_md(conf, res[1], result_icons["pass"] if res[0] else result_icons["fail"])
