@@ -52,9 +52,11 @@ def json_rest(method, url, rest=None):
     return r.json() if r.text else None
 
 
-def issue_reminder(poo):
+def issue_reminder(conf, poo):
     priority = poo['priority']['name']
     msg = 'This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority.'.format(priority=priority, url=data['url'])
+    if 'comment' in conf:
+        msg = conf['comment']
     print(msg)
     if '--reminder-comment-on-issues' in sys.argv:
         url = '{}/{}.json'.format(data['web'], poo['id'])
@@ -66,7 +68,7 @@ def list_issues(conf, root):
         for poo in root['issues']:
             print(data['web'] + '/' + str(poo['id']))
             if 'updated_on' in conf['query']:
-                issue_reminder(poo)
+                issue_reminder(conf, poo)
     except KeyError:
         print("There was an error retrieving the issues " + conf['title'])
     else:
