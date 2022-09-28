@@ -9,6 +9,7 @@ queries:
     min: 11
   - title: Untriaged QA
     query: query_id=576&project_id=115
+    comment: This ticket is still untriaged!
     max: 0
   - title: SLO high (<1 month)
     query: query_id=544

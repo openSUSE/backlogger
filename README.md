@@ -2,7 +2,7 @@
 
 Produce a document with an overview of your backlog. This can be executed as a script with minimal dependencies or via the provided GitHub Action. The result can be injected into another document such as a README.md or uploaded to a service like GitHub Pages. It is recommended to define a convenient schedule to pull in updates from your issue tracker.
 
-Have a look at the [demo hosted on GitHub Pages](https://kalikiana.github.io/backlogger)!
+Have a look at the [demo hosted on GitHub Pages](https://openSUSE.github.io/backlogger)!
 
 ## Inputs
 
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: kalikiana/backlogger@main
+      - uses: openSUSE/backlogger@main
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
           args: --reminder-comment-on-issues
       - uses: JamesIves/github-pages-deploy-action@v4
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: kalikiana/backlogger@main
+      - uses: openSUSE/backlogger@main
         with:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
       - uses: rossjrw/pr-preview-action@v1
