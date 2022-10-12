@@ -70,3 +70,7 @@ jobs:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
       - uses: rossjrw/pr-preview-action@v1
 ```
+
+## License
+
+This project is licensed under the MIT license, see LICENSE file for details.
