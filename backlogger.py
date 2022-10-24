@@ -6,10 +6,13 @@ from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
 import requests
 import yaml
+import re
 
 
 # Icons used for PASS or FAIL in the md file
 result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
+reminder_text = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority."
+reminder_regex = r"^This ticket was set to .* priority but was not updated.* Please consider"
 
 # Initialize a blank md file to replace the current README
 def initialize_md(data):
@@ -60,13 +63,15 @@ def json_rest(method, url, rest=None):
 
 def issue_reminder(conf, poo):
     priority = poo["priority"]["name"]
-    msg = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority.".format(
+    msg = reminder_text.format(
         priority=priority, url=data["url"]
     )
     if "comment" in conf:
         msg = conf["comment"]
     print(msg)
     if "--reminder-comment-on-issues" in sys.argv:
+        if reminder_exists(conf, poo, msg):
+            return
         url = "{}/{}.json".format(data["web"], poo["id"])
         json_rest("PUT", url, {"issue": {"notes": msg}})
 
@@ -83,6 +88,19 @@ def list_issues(conf, root):
         issue_count = int(root["total_count"])
         if issue_count > len(root["issues"]):
             print("there are more issues, check " + get_link(conf))
+
+
+def reminder_exists(conf, poo, msg):
+    url = "{}/{}.json".format(data["web"], poo["id"])
+    root = json_rest("GET", url)
+    if root is not None and 'journals' in root['issue']:
+        journals = root['issue']['journals']
+        for journal in journals:
+            if not 'notes' in journal or len(journal['notes']) == 0:
+                continue
+            if re.search(reminder_regex, journal['notes']):
+                return True
+    return False
 
 
 def failure_more(conf):
