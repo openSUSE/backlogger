@@ -1,7 +1,7 @@
 ---
 name: Backlog Limits Checker
-# yamllint disable-line rule:truthy
 concurrency: preview-${{ github.ref }}
+# yamllint disable-line rule:truthy
 on:
   pull_request:
     types:
