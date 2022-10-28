@@ -1,7 +1,7 @@
 ---
 name: Backlog Limits Checker
-# yamllint disable-line rule:truthy
 concurrency: preview-${{ github.ref }}
+# yamllint disable-line rule:truthy
 on:
   pull_request:
     types:
@@ -16,7 +16,7 @@ jobs:
   backlogger:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Run the action implemented in this repo
         uses: ./
         with:
