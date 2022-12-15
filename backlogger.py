@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
 import requests
+from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from urllib.parse import urlparse
 import yaml
