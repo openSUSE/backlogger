@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
 import requests
+from requests.packages.urllib3.util.retry import Retry
 import yaml
 import re
 
@@ -45,6 +46,14 @@ def results_to_md(conf, number, status):
         md.write(mdlink + " | " + str(number) + " | " + limits + " | " + status + "\n")
 
 
+def retry_request(method, url, data, headers, attempts=7):
+    retries = Retry(total=attempts, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    http = requests.Session()
+    parsed_url = urlparse(url)
+    http.mount("{}://".format(parsed_url.scheme), HTTPAdapter(max_retries=retries))
+    return http.request(method, url, data=data, headers=headers)
+
+
 def json_rest(method, url, rest=None):
     text = json.dumps(rest)
     try:
@@ -56,7 +65,7 @@ def json_rest(method, url, rest=None):
         "Content-Type": "application/json",
         "X-Redmine-API-Key": key,
     }
-    r = requests.request(method, url, data=text, headers=headers)
+    r = retry_request(method, url, data=text, headers=headers)
     r.raise_for_status()
     return r.json() if r.text else None
 
