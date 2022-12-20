@@ -10,9 +10,9 @@ import backlogger
 
 class TestComments(unittest.TestCase):
     def test_comments(self):
-        data = {"url": "https://example.com/issues", "web": "https://example.com/wiki"}
+        data = {"url": "https://example.com/issues", "web": "https://example.com/wiki",
+                "reminder-comment-on-issues": True}
         backlogger.data = data
-        sys.argv[1:] = ["--reminder-comment-on-issues"]
         backlogger.json_rest = MagicMock(return_value=None)
         backlogger.list_issues(
             {"query": "query_id=123&c%5B%5D=updated_on"},
@@ -41,9 +41,10 @@ class TestComments(unittest.TestCase):
 
 
     def test_no_repeat(self):
-        data = {"url": "https://example.com/issues", "web": "https://example.com/wiki", "api": "https://example.com/issues.json"}
+        data = {"url": "https://example.com/issues", "web": "https://example.com/wiki",
+                "api": "https://example.com/issues.json",
+                "reminder-comment-on-issues": True}
         backlogger.data = data
-        sys.argv[1:] = ["--reminder-comment-on-issues"]
         rest = {
             "issue": {
                 "id": 1000,

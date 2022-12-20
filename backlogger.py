@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import sys
 import json
@@ -79,8 +80,7 @@ def issue_reminder(conf, poo):
     )
     if "comment" in conf:
         msg = conf["comment"]
-    print(msg)
-    if "--reminder-comment-on-issues" in sys.argv:
+    if data["reminder-comment-on-issues"]:
         if reminder_exists(conf, poo, msg):
             return
         url = "{}/{}.json".format(data["web"], poo["id"])
@@ -90,15 +90,12 @@ def issue_reminder(conf, poo):
 def list_issues(conf, root):
     try:
         for poo in root["issues"]:
-            print(data["web"] + "/" + str(poo["id"]))
             if "updated_on" in conf["query"]:
                 issue_reminder(conf, poo)
     except KeyError:
         print("There was an error retrieving the issues " + conf["title"])
     else:
-        issue_count = int(root["total_count"])
-        if issue_count > len(root["issues"]):
-            print("there are more issues, check " + get_link(conf))
+        return int(root["total_count"])
 
 
 def reminder_exists(conf, poo, msg):
@@ -119,24 +116,10 @@ def failure_more(conf):
     return False
 
 
-def failure_less(conf):
-    print(conf["title"] + " has less than " + str(conf["min"]) + " tickets!")
-    return False
-
-
 def check_backlog(conf):
     root = json_rest("GET", data["api"] + "?" + conf["query"])
-    list_issues(conf, root)
-    issue_count = int(root["total_count"])
-    if issue_count > conf["max"]:
-        res = failure_more(conf)
-    elif "min" in conf and issue_count < conf["min"]:
-        res = failure_less(conf)
-    else:
-        res = True
-        print(conf["title"] + " length is " + str(issue_count) + ", all good!")
-    if not res:
-        print("Please check " + get_link(conf))
+    issue_count = list_issues(conf, root)
+    res = not(issue_count > conf["max"] or "min" in conf and issue_count < conf["min"])
     return (res, issue_count)
 
 
@@ -148,12 +131,30 @@ def check_query(data):
         )
 
 
+def render_influxdb(data):
+    output = []
+    for conf in data["queries"]:
+        root = json_rest("GET", data["api"] + "?" + conf["query"])
+        issue_count = list_issues(conf, root)
+        output.append('slo,team="{team}",title="{title}" count={count}'.format(
+                      team=data["team"], title=conf["title"], count=issue_count))
+    return output
+
 if __name__ == "__main__":
-    filename = sys.argv[1] if len(sys.argv) > 1 else "queries.yaml"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('config', default='queries.yaml', nargs='?')
+    parser.add_argument('--output', choices=['markdown', 'influxdb'], default='markdown')
+    parser.add_argument("--reminder-comment-on-issues", action='store_false')
+    switches = parser.parse_args()
     try:
-        with open(filename, "r") as config:
+        with open(switches.config, "r") as config:
             data = yaml.safe_load(config)
-            initialize_md(data)
-            check_query(data)
+            data['output'] = switches.output
+            data['reminder-comment-on-issues'] = switches.reminder_comment_on_issues
+            if switches.output == 'influxdb':
+                print("\n".join(line for line in render_influxdb(data)))
+            else:
+                initialize_md(data)
+                check_query(data)
     except FileNotFoundError:
-        sys.exit("Configuration file {} not found".format(filename))
+        sys.exit("Configuration file {} not found".format(switches.config))
