@@ -3,6 +3,7 @@ import argparse
 import os
 import sys
 import json
+from statistics import median_high, variance, mean
 from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
 import requests
@@ -136,8 +137,36 @@ def render_influxdb(data):
     for conf in data["queries"]:
         root = json_rest("GET", data["api"] + "?" + conf["query"])
         issue_count = list_issues(conf, root)
-        output.append('slo,team="{team}",title="{title}" count={count}'.format(
-                      team=data["team"], title=conf["title"], count=issue_count))
+        status_names = []
+        result = {}
+        for issue in root["issues"]:
+            status = issue["status"]["name"]
+            if status not in status_names:
+                status_names.append(status)
+                result[status] = {"avg": 0, "aging": []}
+            start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+            end = datetime.strptime(issue["updated_on"], "%Y-%m-%dT%H:%M:%SZ")
+            result[status]["aging"].append((end - start).total_seconds() / 3600)
+        for status in status_names:
+            avg = mean(result[status]["aging"])
+            med = median_high(result[status]["aging"])
+            count = len(result[status]["aging"])
+            std = variance(result[status]["aging"], avg) if count > 1 else 0
+            measure = 'slo'
+            if status == 'Resolved':
+                measure = 'leadTime'
+            output.append(
+                '{measure},team="{team}",status="{status}",title="{title}" count={count} avg={avg} med={med} std={std}'.format(
+                    measure=measure,
+                    team=data["team"],
+                    status=status,
+                    title=conf["title"],
+                    count=count,
+                    avg=avg,
+                    med=med,
+                    std=std,
+                )
+            )
     return output
 
 if __name__ == "__main__":
