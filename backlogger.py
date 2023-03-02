@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import argparse
 import os
 import sys
 import json
+from statistics import mean
 from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
 import requests
@@ -79,8 +81,7 @@ def issue_reminder(conf, poo):
     )
     if "comment" in conf:
         msg = conf["comment"]
-    print(msg)
-    if "--reminder-comment-on-issues" in sys.argv:
+    if data["reminder-comment-on-issues"]:
         if reminder_exists(conf, poo, msg):
             return
         url = "{}/{}.json".format(data["web"], poo["id"])
@@ -90,15 +91,12 @@ def issue_reminder(conf, poo):
 def list_issues(conf, root):
     try:
         for poo in root["issues"]:
-            print(data["web"] + "/" + str(poo["id"]))
             if "updated_on" in conf["query"]:
                 issue_reminder(conf, poo)
     except KeyError:
         print("There was an error retrieving the issues " + conf["title"])
     else:
-        issue_count = int(root["total_count"])
-        if issue_count > len(root["issues"]):
-            print("there are more issues, check " + get_link(conf))
+        return int(root["total_count"])
 
 
 def reminder_exists(conf, poo, msg):
@@ -119,24 +117,10 @@ def failure_more(conf):
     return False
 
 
-def failure_less(conf):
-    print(conf["title"] + " has less than " + str(conf["min"]) + " tickets!")
-    return False
-
-
 def check_backlog(conf):
     root = json_rest("GET", data["api"] + "?" + conf["query"])
-    list_issues(conf, root)
-    issue_count = int(root["total_count"])
-    if issue_count > conf["max"]:
-        res = failure_more(conf)
-    elif "min" in conf and issue_count < conf["min"]:
-        res = failure_less(conf)
-    else:
-        res = True
-        print(conf["title"] + " length is " + str(issue_count) + ", all good!")
-    if not res:
-        print("Please check " + get_link(conf))
+    issue_count = list_issues(conf, root)
+    res = not(issue_count > conf["max"] or "min" in conf and issue_count < conf["min"])
     return (res, issue_count)
 
 
@@ -148,12 +132,85 @@ def check_query(data):
         )
 
 
+def cycle_time(issue, status_ids):
+    start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+    cycle_time = 0
+
+    url = "{}/{}.json?include=journals".format(data["web"], issue["id"])
+    issue = json_rest("GET", url)["issue"]
+    for journal in issue["journals"]:
+        for detail in journal["details"]:
+            if detail["name"] == "status_id":
+                if detail["new_value"] == str(status_ids["In Progress"]):
+                    start = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+                elif detail["old_value"] == str(status_ids["In Progress"]):
+                    end = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+                    cycle_time += (end - start).total_seconds() / 3600
+    return cycle_time
+
+
+def render_influxdb(data):
+    output = []
+
+    statuses = json_rest("GET", data["api"].replace("issues", "issue_statuses"))
+    status_ids = {}
+    for status in statuses["issue_statuses"]:
+        status_ids[status["name"]] = status["id"]
+
+    for conf in data["queries"]:
+        root = json_rest("GET", data["api"] + "?" + conf["query"])
+        issue_count = list_issues(conf, root)
+        status_names = []
+        result = {}
+        for issue in root["issues"]:
+            status = issue["status"]["name"]
+            if status not in status_names:
+                status_names.append(status)
+                result[status] = {"avg": 0, "leadTime": [], "cycleTime": []}
+
+            start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+            end = datetime.strptime(issue["updated_on"], "%Y-%m-%dT%H:%M:%SZ")
+            result[status]["leadTime"].append((end - start).total_seconds() / 3600)
+            if status == "Resolved":
+                result[status]["cycleTime"].append(cycle_time(issue, status_ids))
+        for status in status_names:
+            count = len(result[status]["leadTime"])
+            if status == "Resolved":
+                measure = "leadTime"
+                extra = " leadTime={leadTime} cycleTime={cycleTime}".format(
+                    leadTime=mean(result[status]["leadTime"]),
+                    cycleTime=mean(result[status]["cycleTime"]),
+                )
+            else:
+                measure = "slo"
+                extra = ""
+            output.append(
+                '{measure},team="{team}",status="{status}",title="{title}" count={count}{extra}'.format(
+                    measure=measure,
+                    team=data["team"],
+                    status=status,
+                    title=conf["title"],
+                    count=count,
+                    extra=extra,
+                )
+            )
+    return output
+
 if __name__ == "__main__":
-    filename = sys.argv[1] if len(sys.argv) > 1 else "queries.yaml"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('config', default='queries.yaml', nargs='?')
+    parser.add_argument('--output', choices=['markdown', 'influxdb'], default='markdown')
+    parser.add_argument("--reminder-comment-on-issues", action='store_false')
+    switches = parser.parse_args()
     try:
-        with open(filename, "r") as config:
+        with open(switches.config, "r") as config:
             data = yaml.safe_load(config)
-            initialize_md(data)
-            check_query(data)
+            data['output'] = switches.output
+            data['reminder-comment-on-issues'] = switches.reminder_comment_on_issues
+            if switches.output == 'influxdb':
+                print("\n".join(line for line in render_influxdb(data)))
+            else:
+                initialize_md(data)
+                check_query(data)
     except FileNotFoundError:
-        sys.exit("Configuration file {} not found".format(filename))
+        sys.exit("Configuration file {} not found".format(switches.config))
