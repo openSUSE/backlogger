@@ -145,7 +145,7 @@ def cycle_time(issue, status_ids):
                     start = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
                 elif detail["old_value"] == str(status_ids["In Progress"]):
                     end = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
-                    cycle_time += (end - start).total_seconds() / 3600
+                    cycle_time += (end - start).total_seconds()
     return cycle_time
 
 
@@ -170,16 +170,18 @@ def render_influxdb(data):
 
             start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
             end = datetime.strptime(issue["updated_on"], "%Y-%m-%dT%H:%M:%SZ")
-            result[status]["leadTime"].append((end - start).total_seconds() / 3600)
+            result[status]["leadTime"].append((end - start).total_seconds())
             if status == "Resolved":
                 result[status]["cycleTime"].append(cycle_time(issue, status_ids))
         for status in status_names:
             count = len(result[status]["leadTime"])
             if status == "Resolved":
                 measure = "leadTime"
-                extra = ",leadTime={leadTime},cycleTime={cycleTime}".format(
-                    leadTime=mean(result[status]["leadTime"]),
-                    cycleTime=mean(result[status]["cycleTime"]),
+                extra = ",leadTime={leadTime},cycleTime={cycleTime},leadTimeSum={leadTimeSum},cycleTimeSum={cycleTimeSum}".format(
+                    leadTime=mean(result[status]["leadTime"]) / 3600,
+                    cycleTime=mean(result[status]["cycleTime"]) / 3600,
+                    leadTimeSum=sum(result[status]["leadTime"]) / 3600,
+                    cycleTimeSum=sum(result[status]["cycleTime"]) / 3600,
                 )
             else:
                 measure = "slo"

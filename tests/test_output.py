@@ -41,8 +41,14 @@ class TestOutput(unittest.TestCase):
                             "created_on": "2022-12-06T13:57:05Z",
                             "updated_on": "2022-12-22T13:12:22Z",
                         },
+                        {
+                            "id": 4,
+                            "status": {"name": "Resolved"},
+                            "created_on": "2022-12-08T10:00:00Z",
+                            "updated_on": "2022-12-15T10:00:00Z",
+                        },
                     ],
-                    "total_count": 3,
+                    "total_count": 4,
                 },
                 {
                     "issue": {
@@ -64,12 +70,32 @@ class TestOutput(unittest.TestCase):
                         ]
                     }
                 },
+                {
+                    "issue": {
+                        "journals": [
+                            {
+                                "details": [{"name": "status_id", "new_value": "2"}],
+                                "created_on": "2022-12-10T10:00:00Z",
+                            },
+                            {
+                                "details": [
+                                    {
+                                        "name": "status_id",
+                                        "old_value": "2",
+                                        "new_value": "3",
+                                    }
+                                ],
+                                "created_on": "2022-12-12T10:00:00Z",
+                            },
+                        ]
+                    }
+                },
             ]
         )
         self.assertEqual(
             backlogger.render_influxdb(data),
             [
                 'slo,team="Awesome\\ Team",status="In\\ Progress",title="Workable\\ Backlog" count=2',
-                'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=1,leadTime=383.2547222222222,cycleTime=48.0',
+                'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=2,leadTime=275.6273611111111,cycleTime=48.0,leadTimeSum=551.2547222222222,cycleTimeSum=96.0',
             ],
         )
