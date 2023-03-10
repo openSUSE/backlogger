@@ -177,7 +177,7 @@ def render_influxdb(data):
             count = len(result[status]["leadTime"])
             if status == "Resolved":
                 measure = "leadTime"
-                extra = " leadTime={leadTime} cycleTime={cycleTime}".format(
+                extra = ",leadTime={leadTime},cycleTime={cycleTime}".format(
                     leadTime=mean(result[status]["leadTime"]),
                     cycleTime=mean(result[status]["cycleTime"]),
                 )
@@ -187,9 +187,9 @@ def render_influxdb(data):
             output.append(
                 '{measure},team="{team}",status="{status}",title="{title}" count={count}{extra}'.format(
                     measure=measure,
-                    team=data["team"],
-                    status=status,
-                    title=conf["title"],
+                    team="\\ ".join(data["team"].split(" ")),
+                    status="\\ ".join(status.split(" ")),
+                    title="\\ ".join(conf["title"].split(" ")),
                     count=count,
                     extra=extra,
                 )
