@@ -166,7 +166,7 @@ def render_influxdb(data):
             status = issue["status"]["name"]
             if status not in status_names:
                 status_names.append(status)
-                result[status] = {"avg": 0, "leadTime": [], "cycleTime": []}
+                result[status] = {"leadTime": [], "cycleTime": []}
 
             start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
             end = datetime.strptime(issue["updated_on"], "%Y-%m-%dT%H:%M:%SZ")
