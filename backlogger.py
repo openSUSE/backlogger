@@ -158,7 +158,7 @@ def render_influxdb(data):
         status_ids[status["name"]] = status["id"]
 
     for conf in data["queries"]:
-        root = json_rest("GET", data["api"] + "?" + conf["query"])
+        root = json_rest("GET", data["api"] + "?" + conf["query"] + "&limit=100")
         issue_count = list_issues(conf, root)
         status_names = []
         result = {}
