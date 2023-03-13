@@ -69,7 +69,7 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(
             backlogger.render_influxdb(data),
             [
-                'slo,team="Awesome Team",status="In Progress",title="Workable Backlog" count=2',
-                'leadTime,team="Awesome Team",status="Resolved",title="Workable Backlog" count=1 leadTime=383.2547222222222 cycleTime=48.0',
+                'slo,team="Awesome\\ Team",status="In\\ Progress",title="Workable\\ Backlog" count=2',
+                'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=1,leadTime=383.2547222222222,cycleTime=48.0',
             ],
         )
