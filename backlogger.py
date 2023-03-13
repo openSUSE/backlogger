@@ -145,7 +145,7 @@ def cycle_time(issue, status_ids):
                     start = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
                 elif detail["old_value"] == str(status_ids["In Progress"]):
                     end = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
-                    cycle_time += (end - start).total_seconds() / 3600
+                    cycle_time += (end - start).total_seconds()
     return cycle_time
 
 
@@ -166,20 +166,23 @@ def render_influxdb(data):
             status = issue["status"]["name"]
             if status not in status_names:
                 status_names.append(status)
-                result[status] = {"avg": 0, "leadTime": [], "cycleTime": []}
+                result[status] = {"leadTime": [], "cycleTime": []}
 
             start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
             end = datetime.strptime(issue["updated_on"], "%Y-%m-%dT%H:%M:%SZ")
-            result[status]["leadTime"].append((end - start).total_seconds() / 3600)
+            result[status]["leadTime"].append((end - start).total_seconds())
             if status == "Resolved":
                 result[status]["cycleTime"].append(cycle_time(issue, status_ids))
         for status in status_names:
-            count = len(result[status]["leadTime"])
+            times = result[status]
+            count = len(times["leadTime"])
             if status == "Resolved":
                 measure = "leadTime"
-                extra = ",leadTime={leadTime},cycleTime={cycleTime}".format(
-                    leadTime=mean(result[status]["leadTime"]),
-                    cycleTime=mean(result[status]["cycleTime"]),
+                extra = ",leadTime={leadTime},cycleTime={cycleTime},leadTimeSum={leadTimeSum},cycleTimeSum={cycleTimeSum}".format(
+                    leadTime=mean(times["leadTime"]) / 3600,
+                    cycleTime=mean(times["cycleTime"]) / 3600,
+                    leadTimeSum=sum(times["leadTime"]) / 3600,
+                    cycleTimeSum=sum(times["cycleTime"]) / 3600,
                 )
             else:
                 measure = "slo"
