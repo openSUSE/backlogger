@@ -174,14 +174,15 @@ def render_influxdb(data):
             if status == "Resolved":
                 result[status]["cycleTime"].append(cycle_time(issue, status_ids))
         for status in status_names:
-            count = len(result[status]["leadTime"])
+            times = result[status]
+            count = len(times["leadTime"])
             if status == "Resolved":
                 measure = "leadTime"
                 extra = ",leadTime={leadTime},cycleTime={cycleTime},leadTimeSum={leadTimeSum},cycleTimeSum={cycleTimeSum}".format(
-                    leadTime=mean(result[status]["leadTime"]) / 3600,
-                    cycleTime=mean(result[status]["cycleTime"]) / 3600,
-                    leadTimeSum=sum(result[status]["leadTime"]) / 3600,
-                    cycleTimeSum=sum(result[status]["cycleTime"]) / 3600,
+                    leadTime=mean(times["leadTime"]) / 3600,
+                    cycleTime=mean(times["cycleTime"]) / 3600,
+                    leadTimeSum=sum(times["leadTime"]) / 3600,
+                    cycleTimeSum=sum(times["cycleTime"]) / 3600,
                 )
             else:
                 measure = "slo"
