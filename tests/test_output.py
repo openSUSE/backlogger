@@ -9,15 +9,16 @@ import backlogger
 
 
 class TestOutput(unittest.TestCase):
-    def test_influxdb(self):
+    def setUp(self):
         data = {
             "api": "https://example.com/issues.json",
             "web": "https://example.com/issues",
             "team": "Awesome Team",
-            "output": "influxdb",
             "queries": [{"title": "Workable Backlog", "query": "query_id=123"}],
         }
         backlogger.data = data
+
+    def test_influxdb(self):
         backlogger.json_rest = MagicMock(
             side_effect=[
                 {"issue_statuses": [{"name": "In Progress", "id": 2}]},
@@ -93,9 +94,38 @@ class TestOutput(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            backlogger.render_influxdb(data),
+            backlogger.render_influxdb(backlogger.data),
             [
                 'slo,team="Awesome\\ Team",status="In\\ Progress",title="Workable\\ Backlog" count=2',
                 'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=2,leadTime=275.6273611111111,cycleTime=48.0,leadTimeSum=551.2547222222222,cycleTimeSum=96.0',
             ],
         )
+
+    def test_markdown(self):
+        scenarios = [
+            {"icon": "&#x1F49A;", "limit": "", "data": {}},
+            {"icon": "&#x1F534;", "limit": "<2", "data": {"max": 1}},
+            {"icon": "&#x1F49A;", "limit": "<5, >0", "data": {"min": 1, "max": 4}},
+            {"icon": "&#x1F534;", "limit": "<5, >2", "data": {"min": 3, "max": 4}},
+        ]
+        for scenario in scenarios:
+            query = {"title": "Workable Backlog", "query": "query_id=123"}
+            query.update(scenario["data"])
+            backlogger.data["queries"] = [query]
+            backlogger.json_rest = MagicMock(
+                side_effect=[
+                    {
+                        "issues": [],
+                        "total_count": 2,
+                    },
+                ]
+            )
+            self.assertEqual(
+                backlogger.render_table(backlogger.data),
+                [
+                    ['[Workable Backlog](https://example.com/issues?query_id=123)',
+                    '2',
+                    scenario["limit"],
+                    scenario["icon"]],
+                ],
+            )

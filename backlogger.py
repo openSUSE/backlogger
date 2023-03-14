@@ -35,21 +35,6 @@ def initialize_md(data):
         )
 
 
-def get_link(conf):
-    return data["web"] + "?" + conf["query"]
-
-
-# Append individual results to md file
-def results_to_md(conf, number, status):
-    mdlink = "[" + conf["title"] + "](" + get_link(conf) + ")"
-    lessthan = conf["max"] + 1
-    limits = "<" + str(lessthan)
-    if "min" in conf:
-        limits += ", >" + str(conf["min"] - 1)
-    with open("index.md", "a") as md:
-        md.write(mdlink + " | " + str(number) + " | " + limits + " | " + status + "\n")
-
-
 def retry_request(method, url, data, headers, attempts=7):
     retries = Retry(total=attempts, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
     http = requests.Session()
@@ -120,16 +105,26 @@ def failure_more(conf):
 def check_backlog(conf):
     root = json_rest("GET", data["api"] + "?" + conf["query"])
     issue_count = list_issues(conf, root)
-    res = not(issue_count > conf["max"] or "min" in conf and issue_count < conf["min"])
-    return (res, issue_count)
+    good = True
+    if "max" in conf:
+        good = not(issue_count > conf["max"] or "min" in conf and issue_count < conf["min"])
+    return (good, issue_count)
 
 
-def check_query(data):
+def render_table(data):
+    rows = []
     for conf in data["queries"]:
-        res = check_backlog(conf)
-        results_to_md(
-            conf, res[1], result_icons["pass"] if res[0] else result_icons["fail"]
-        )
+        good, issue_count = check_backlog(conf)
+        url = data["web"] + "?" + conf["query"]
+        limits = "<" + str(conf["max"] + 1) if "max" in conf else ""
+        if "min" in conf:
+            limits += ", >" + str(conf["min"] - 1)
+        rows.append([
+            "[" + conf["title"] + "](" + url + ")",
+            str(issue_count),
+            limits,
+            result_icons["pass"] if good else result_icons["fail"]])
+    return rows
 
 
 def cycle_time(issue, status_ids):
@@ -208,12 +203,13 @@ if __name__ == "__main__":
     try:
         with open(switches.config, "r") as config:
             data = yaml.safe_load(config)
-            data['output'] = switches.output
             data['reminder-comment-on-issues'] = switches.reminder_comment_on_issues
             if switches.output == 'influxdb':
                 print("\n".join(line for line in render_influxdb(data)))
             else:
                 initialize_md(data)
-                check_query(data)
+                with open("index.md", "a") as md:
+                    for row in render_table(data):
+                        md.write("|".join(row) + "\n")
     except FileNotFoundError:
         sys.exit("Configuration file {} not found".format(switches.config))

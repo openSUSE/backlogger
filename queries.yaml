@@ -18,3 +18,5 @@ queries:
     query: query_id=520
     max: 30
     min: 1
+  - title: Closed yesterday
+    query: query_id=773
