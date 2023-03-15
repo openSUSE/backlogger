@@ -116,7 +116,10 @@ def render_table(data):
     for conf in data["queries"]:
         good, issue_count = check_backlog(conf)
         url = data["web"] + "?" + conf["query"]
-        limits = "<" + str(conf["max"] + 1) if "max" in conf else ""
+        # Omit unrestricted queries from the table
+        if "max" not in conf:
+            continue
+        limits = "<" + str(conf["max"] + 1)
         if "min" in conf:
             limits += ", >" + str(conf["min"] - 1)
         rows.append([

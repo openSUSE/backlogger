@@ -103,7 +103,6 @@ class TestOutput(unittest.TestCase):
 
     def test_markdown(self):
         scenarios = [
-            {"icon": "&#x1F49A;", "limit": "", "data": {}},
             {"icon": "&#x1F534;", "limit": "<2", "data": {"max": 1}},
             {"icon": "&#x1F49A;", "limit": "<5, >0", "data": {"min": 1, "max": 4}},
             {"icon": "&#x1F534;", "limit": "<5, >2", "data": {"min": 3, "max": 4}},
@@ -129,3 +128,18 @@ class TestOutput(unittest.TestCase):
                     scenario["icon"]],
                 ],
             )
+
+        # A query with no limits will not be included in the table
+        backlogger.data["queries"] = [{"title": "Workable Backlog", "query": "query_id=123"}]
+        backlogger.json_rest = MagicMock(
+            side_effect=[
+                {
+                    "issues": [],
+                    "total_count": 2,
+                },
+            ]
+        )
+        self.assertEqual(
+            backlogger.render_table(backlogger.data),
+            []
+        )
