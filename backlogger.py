@@ -144,6 +144,12 @@ def cycle_time(issue, status_ids):
     return cycle_time
 
 
+def _today_nanoseconds():
+    dt = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
+    epoch = datetime.utcfromtimestamp(0)
+    return int((dt-epoch).total_seconds()*1000000000)
+
+
 def render_influxdb(data):
     output = []
 
@@ -192,6 +198,8 @@ def render_influxdb(data):
                     extra=extra,
                 )
             )
+            if status == "Resolved":
+                output[-1] += " " + str(_today_nanoseconds())
     return output
 
 if __name__ == "__main__":
