@@ -93,11 +93,12 @@ class TestOutput(unittest.TestCase):
                 },
             ]
         )
+        backlogger._today_nanoseconds = MagicMock(side_effect=[23])
         self.assertEqual(
             backlogger.render_influxdb(backlogger.data),
             [
                 'slo,team="Awesome\\ Team",status="In\\ Progress",title="Workable\\ Backlog" count=2',
-                'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=2,leadTime=275.6273611111111,cycleTime=48.0,leadTimeSum=551.2547222222222,cycleTimeSum=96.0',
+                'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=2,leadTime=275.6273611111111,cycleTime=48.0,leadTimeSum=551.2547222222222,cycleTimeSum=96.0 23',
             ],
         )
 
