@@ -117,6 +117,7 @@ def check_backlog(conf):
 
 
 def render_table(data):
+    all_good = True
     rows = []
     for conf in data["queries"]:
         good, issue_count = check_backlog(conf)
@@ -132,7 +133,9 @@ def render_table(data):
                 result_icons["pass"] if good else result_icons["fail"],
             ]
         )
-    return rows
+        if not good:
+            all_good = False
+    return (all_good, rows)
 
 
 def cycle_time(issue, status_ids):
@@ -220,8 +223,10 @@ if __name__ == "__main__":
         "--output", choices=["markdown", "influxdb"], default="markdown"
     )
     parser.add_argument("--reminder-comment-on-issues", action="store_false")
+    parser.add_argument("--exit-code", action="store_true")
     switches = parser.parse_args()
     try:
+        all_good = True
         with open(switches.config, "r") as config:
             data = yaml.safe_load(config)
             data["reminder-comment-on-issues"] = switches.reminder_comment_on_issues
@@ -230,7 +235,10 @@ if __name__ == "__main__":
             else:
                 initialize_md(data)
                 with open("index.md", "a") as md:
-                    for row in render_table(data):
+                    all_good, rows = render_table(data)
+                    for row in rows:
                         md.write("|".join(row) + "\n")
     except FileNotFoundError:
         sys.exit("Configuration file {} not found".format(switches.config))
+    if switches.exit_code and not all_good:
+        sys.exit(3)
