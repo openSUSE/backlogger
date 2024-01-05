@@ -124,9 +124,11 @@ class TestOutput(unittest.TestCase):
             self.assertEqual(
                 backlogger.render_table(backlogger.data),
                 [
-                    ['[Workable Backlog](https://example.com/issues?query_id=123)',
-                    '2',
-                    scenario["limit"],
-                    scenario["icon"]],
+                    [
+                        "[Workable Backlog](https://example.com/issues?query_id=123)",
+                        "2",
+                        scenario["limit"],
+                        scenario["icon"],
+                    ],
                 ],
             )
