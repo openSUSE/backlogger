@@ -37,7 +37,7 @@ runs:
         python -m pip install --upgrade pip
         pip install -r backlogger/requirements.txt
       shell: bash
-    - run: sudo apt-get install -y kramdown
+    - run: sudo apt-get install -y kramdown weasyprint imagemagick ghostscript
       shell: bash
     - name: Render Markdown from configured backlog queries
       run: python backlogger/backlogger.py ${{ inputs.config }} ${{ inputs.args }}
@@ -51,4 +51,11 @@ runs:
           cat ../backlogger/head.html >index.html
           kramdown ../index.md >>index.html
           sed s@GITHUB_REPOSITORY@${{ github.repository }}@g ../backlogger/foot.html >>index.html
+      shell: bash
+    - name: Render PNG preview
+      run: |
+        cd ${{ inputs.folder }}
+        # Remove workaround for already fixed CVE-2018-16509
+        sudo sed -i '/rights="none" pattern="PDF"/d' /etc/ImageMagick-6/policy.xml
+        weasyprint index.html - | convert - -trim preview.png
       shell: bash
