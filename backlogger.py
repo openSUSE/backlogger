@@ -126,12 +126,14 @@ def render_table(data):
             result_icons["pass"] if good else result_icons["fail"]])
     return rows
 
+def remove_project_part_from_url(url):
+    return(re.sub("projects\/.*\/", "", url))
 
 def cycle_time(issue, status_ids):
     start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
     cycle_time = 0
 
-    url = "{}/{}.json?include=journals".format(data["web"], issue["id"])
+    url = "{}/{}.json?include=journals".format(remove_project_part_from_url(data["web"]), issue["id"])
     issue = json_rest("GET", url)["issue"]
     for journal in issue["journals"]:
         for detail in journal["details"]:
@@ -153,7 +155,7 @@ def _today_nanoseconds():
 def render_influxdb(data):
     output = []
 
-    statuses = json_rest("GET", data["api"].replace("issues", "issue_statuses"))
+    statuses = json_rest("GET", remove_project_part_from_url(data["api"]).replace("issues", "issue_statuses"))
     status_ids = {}
     for status in statuses["issue_statuses"]:
         status_ids[status["name"]] = status["id"]
