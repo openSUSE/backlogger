@@ -17,7 +17,10 @@ import re
 # Icons used for PASS or FAIL in the md file
 result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
 reminder_text = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority."
-reminder_regex = r"^This ticket was set to .* priority but was not updated.* Please consider"
+reminder_regex = (
+    r"^This ticket was set to .* priority but was not updated.* Please consider"
+)
+
 
 # Initialize a blank md file to replace the current README
 def initialize_md(data):
@@ -36,7 +39,9 @@ def initialize_md(data):
 
 
 def retry_request(method, url, data, headers, attempts=7):
-    retries = Retry(total=attempts, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504])
+    retries = Retry(
+        total=attempts, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504]
+    )
     http = requests.Session()
     parsed_url = urlparse(url)
     http.mount("{}://".format(parsed_url.scheme), HTTPAdapter(max_retries=retries))
@@ -61,9 +66,7 @@ def json_rest(method, url, rest=None):
 
 def issue_reminder(conf, poo):
     priority = poo["priority"]["name"]
-    msg = reminder_text.format(
-        priority=priority, url=data["url"]
-    )
+    msg = reminder_text.format(priority=priority, url=data["url"])
     if "comment" in conf:
         msg = conf["comment"]
     if data["reminder-comment-on-issues"]:
@@ -87,12 +90,12 @@ def list_issues(conf, root):
 def reminder_exists(conf, poo, msg):
     url = "{}/{}.json".format(data["web"], poo["id"])
     root = json_rest("GET", url)
-    if root is not None and 'journals' in root['issue']:
-        journals = root['issue']['journals']
+    if root is not None and "journals" in root["issue"]:
+        journals = root["issue"]["journals"]
         for journal in journals:
-            if not 'notes' in journal or len(journal['notes']) == 0:
+            if not "notes" in journal or len(journal["notes"]) == 0:
                 continue
-            if re.search(reminder_regex, journal['notes']):
+            if re.search(reminder_regex, journal["notes"]):
                 return True
     return False
 
@@ -107,11 +110,14 @@ def check_backlog(conf):
     issue_count = list_issues(conf, root)
     good = True
     if "max" in conf:
-        good = not(issue_count > conf["max"] or "min" in conf and issue_count < conf["min"])
+        good = not (
+            issue_count > conf["max"] or "min" in conf and issue_count < conf["min"]
+        )
     return (good, issue_count)
 
 
 def render_table(data):
+    all_good = True
     rows = []
     for conf in data["queries"]:
         good, issue_count = check_backlog(conf)
@@ -119,12 +125,17 @@ def render_table(data):
         limits = "<" + str(conf["max"] + 1) if "max" in conf else ""
         if "min" in conf:
             limits += ", >" + str(conf["min"] - 1)
-        rows.append([
-            "[" + conf["title"] + "](" + url + ")",
-            str(issue_count),
-            limits,
-            result_icons["pass"] if good else result_icons["fail"]])
-    return rows
+        rows.append(
+            [
+                "[" + conf["title"] + "](" + url + ")",
+                str(issue_count),
+                limits,
+                result_icons["pass"] if good else result_icons["fail"],
+            ]
+        )
+        if not good:
+            all_good = False
+    return (all_good, rows)
 
 def remove_project_part_from_url(url):
     return(re.sub("projects\/.*\/", "", url))
@@ -139,7 +150,9 @@ def cycle_time(issue, status_ids):
         for detail in journal["details"]:
             if detail["name"] == "status_id":
                 if detail["new_value"] == str(status_ids["In Progress"]):
-                    start = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+                    start = datetime.strptime(
+                        journal["created_on"], "%Y-%m-%dT%H:%M:%SZ"
+                    )
                 elif detail["old_value"] == str(status_ids["In Progress"]):
                     end = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
                     cycle_time += (end - start).total_seconds()
@@ -149,7 +162,7 @@ def cycle_time(issue, status_ids):
 def _today_nanoseconds():
     dt = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
     epoch = datetime.utcfromtimestamp(0)
-    return int((dt-epoch).total_seconds()*1000000000)
+    return int((dt - epoch).total_seconds() * 1000000000)
 
 
 def render_influxdb(data):
@@ -204,22 +217,30 @@ def render_influxdb(data):
                 output[-1] += " " + str(_today_nanoseconds())
     return output
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('config', default='queries.yaml', nargs='?')
-    parser.add_argument('--output', choices=['markdown', 'influxdb'], default='markdown')
-    parser.add_argument("--reminder-comment-on-issues", action='store_false')
+    parser.add_argument("config", default="queries.yaml", nargs="?")
+    parser.add_argument(
+        "--output", choices=["markdown", "influxdb"], default="markdown"
+    )
+    parser.add_argument("--reminder-comment-on-issues", action="store_false")
+    parser.add_argument("--exit-code", action="store_true")
     switches = parser.parse_args()
     try:
+        all_good = True
         with open(switches.config, "r") as config:
             data = yaml.safe_load(config)
-            data['reminder-comment-on-issues'] = switches.reminder_comment_on_issues
-            if switches.output == 'influxdb':
+            data["reminder-comment-on-issues"] = switches.reminder_comment_on_issues
+            if switches.output == "influxdb":
                 print("\n".join(line for line in render_influxdb(data)))
             else:
                 initialize_md(data)
                 with open("index.md", "a") as md:
-                    for row in render_table(data):
+                    all_good, rows = render_table(data)
+                    for row in rows:
                         md.write("|".join(row) + "\n")
     except FileNotFoundError:
         sys.exit("Configuration file {} not found".format(switches.config))
+    if switches.exit_code and not all_good:
+        sys.exit(3)

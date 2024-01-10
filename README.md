@@ -16,6 +16,8 @@ Additional arguments affecting the behavior of the script:
 
 `--reminder-comment-on-issues` can be added here to enable automatic reminder comments. This is **not** enabled by default because it's designed to be used in scheduled runs. Manual execution and previews of changed queries are not expected to have side-effects.
 
+`--exit-code` can be added to also emit return code 3 if any of the configured queries is not within its limit.
+
 ## folder
 
 The output folder for the generated HTML. By default this is `gh-pages`.
