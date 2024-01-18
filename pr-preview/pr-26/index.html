@@ -1,0 +1,82 @@
+<html prefix="og: https://ogp.me/ns#">
+<head>
+<title>Backlog Status</title>
+<meta charset="UTF-8">
+<!-- Facebook / Slack tags -->
+<meta property="og:title" content="Backlog Limits Checker" />
+<meta property="og:url" content="https://github.com/openSUSE/backlogger" />
+<meta property="og:image" content="https://openSUSE.github.io/backlogger/pr-preview/pr-26/preview.png?v=1705580952" />
+<style>
+body {
+    font-family: Verdana, Arial;
+    border-top: 5px solid #55cc33;
+    margin: 0px 5px 5px 5px;
+}
+table {
+    border: 1px solid #a8a8a8;
+    border-collapse: collapse;
+    box-shadow: 2px 2px 4px 1px grey;
+}
+table tr th, table tr td {
+    border: 1px solid #a8a8a8;
+    background-color: white;
+    padding: 3px;
+}
+a {
+    text-decoration: none;
+    font-weight: bold;
+}
+</style>
+</head>
+<body>
+<h1 id="backlog-status">Backlog Status</h1>
+
+<p>This is the dashboard for <a href="http://example.com">Example</a>.
+<strong>Latest Run:</strong> 2024-01-18 12:29:09 UTC
+<em>(Please refresh to see latest results)</em></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Backlog Query</th>
+      <th>Number of Issues</th>
+      <th>Limits</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="https://progress.opensuse.org/issues?query_id=478">Workable Backlog</a></td>
+      <td>25</td>
+      <td>&lt;40, &gt;10</td>
+      <td>💚</td>
+    </tr>
+    <tr>
+      <td><a href="https://progress.opensuse.org/issues?query_id=576&amp;project_id=115">Untriaged QA</a></td>
+      <td>0</td>
+      <td>&lt;1</td>
+      <td>💚</td>
+    </tr>
+    <tr>
+      <td><a href="https://progress.opensuse.org/issues?query_id=544">SLO high (&lt;1 month)</a></td>
+      <td>0</td>
+      <td>&lt;1</td>
+      <td>💚</td>
+    </tr>
+    <tr>
+      <td><a href="https://progress.opensuse.org/issues?query_id=520">In Feedback</a></td>
+      <td>5</td>
+      <td>&lt;31, &gt;0</td>
+      <td>💚</td>
+    </tr>
+    <tr>
+      <td><a href="https://progress.opensuse.org/issues?query_id=773">Closed yesterday</a></td>
+      <td>3</td>
+      <td> </td>
+      <td>💚</td>
+    </tr>
+  </tbody>
+</table>
+<hr>
+<a href="https://github.com/openSUSE/backlogger">openSUSE/backlogger on GitHub</a>
+</body></html>
