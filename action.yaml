@@ -52,9 +52,10 @@ runs:
           org=${{ github.repository_owner }}
           repo=$(cut -f2 -d/ <<<${{ github.repository }})
           [ "${{ github.event_name }}" == pull_request ] && extra="/pr-preview/pr-${{ github.event.number }}"
-          preview="preview_$(date +%s).png"
+          preview_date="$(date +%s)"
+          preview="preview.png"
           echo "PREVIEW_NAME=$preview" >> "$GITHUB_ENV"
-          echo "PREVIEW_URL=https://$org.github.io/$repo$extra/$preview" >> "$GITHUB_ENV"
+          echo "PREVIEW_URL=https://$org.github.io/$repo$extra/$preview?v=$preview_date" >> "$GITHUB_ENV"
           if [ "${{ env.BACKLOG_STATUS }}" -eq 0 ]; then
             color="#55cc33"
           else
