@@ -195,27 +195,42 @@ def render_influxdb(data):
             if status == "Resolved":
                 measure = "leadTime"
                 extra = ",leadTime={leadTime},cycleTime={cycleTime},leadTimeSum={leadTimeSum},cycleTimeSum={cycleTimeSum}".format(
-                    leadTime=mean(times["leadTime"]) / 3600,
-                    cycleTime=mean(times["cycleTime"]) / 3600,
-                    leadTimeSum=sum(times["leadTime"]) / 3600,
-                    cycleTimeSum=sum(times["cycleTime"]) / 3600,
+                    leadTime=escape_telegraf_str(mean(times["leadTime"]) / 3600, "field value"),
+                    cycleTime=escape_telegraf_str(mean(times["cycleTime"]) / 3600, "field value"),
+                    leadTimeSum=escape_telegraf_str(sum(times["leadTime"]) / 3600, "field value"),
+                    cycleTimeSum=escape_telegraf_str(sum(times["cycleTime"]) / 3600, "field value"),
                 )
             else:
                 measure = "slo"
                 extra = ""
             output.append(
                 '{measure},team="{team}",status="{status}",title="{title}" count={count}{extra}'.format(
-                    measure=measure,
-                    team="\\ ".join(data["team"].split(" ")),
-                    status="\\ ".join(status.split(" ")),
-                    title="\\ ".join(conf["title"].split(" ")),
-                    count=count,
+                    measure=escape_telegraf_str(measure, "measurement"),
+                    team=escape_telegraf_str(data["team"], "tag value"),
+                    status=escape_telegraf_str(status, "tag value"),
+                    title=escape_telegraf_str(conf["title"], "tag value"),
+                    count=escape_telegraf_str(count, "field value"),
                     extra=extra,
                 )
             )
             if status == "Resolved":
                 output[-1] += " " + str(_today_nanoseconds())
     return output
+
+def escape_telegraf_str(value_to_escape, element):
+    # See https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/#special-characters for escaping rules and where they apply
+    escaped_str = str(value_to_escape) #especially for field values it can happen that we get an int
+    if (element == "field value"): #field values are the only thing where unique rules apply
+        escaped_str = escaped_str.replace("\\", "\\\\")
+        escaped_str = escaped_str.replace("\"", "\\\"")
+        return escaped_str
+
+    # common rules applicable to everything else
+    escaped_str = escaped_str.replace(",", "\\,")
+    escaped_str = escaped_str.replace(" ", "\\ ")
+    if (element != "measurement"):
+        escaped_str = escaped_str.replace("=", "\\=")
+    return escaped_str
 
 
 if __name__ == "__main__":
