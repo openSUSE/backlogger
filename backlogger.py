@@ -119,6 +119,7 @@ def check_backlog(conf):
 def render_table(data):
     all_good = True
     rows = []
+    bad_queries = {}
     for conf in data["queries"]:
         good, issue_count = check_backlog(conf)
         url = data["web"] + "?" + conf["query"]
@@ -135,7 +136,8 @@ def render_table(data):
         )
         if not good:
             all_good = False
-    return (all_good, rows)
+            bad_queries[conf['title']] = {"url": url, "issue_count": issue_count, "limits": limits}
+    return (all_good, rows, bad_queries)
 
 def remove_project_part_from_url(url):
     return(re.sub("projects\/.*\/", "", url))
@@ -232,6 +234,40 @@ def escape_telegraf_str(value_to_escape, element):
         escaped_str = escaped_str.replace("=", "\\=")
     return escaped_str
 
+def get_state():
+    if os.environ.get('STATE_FOLDER'):
+        old_state_file = os.path.join(os.environ['STATE_FOLDER'], "state.json")
+        if os.path.exists(old_state_file):
+            # open state.json from last run, see if anything changed and send slack notification if needed
+            with open(old_state_file, "r") as sj:
+                return json.load(sj)
+
+def update_state(bad_queries):
+    with open("state.json", "w") as sj:
+        state = {
+            "bad_queries": bad_queries,
+            "updated": datetime.now().isoformat()
+        }
+        json.dump(state, sj)
+
+def trigger_webhook(state, bad_queries):
+    if state:
+        old_bad_queries = set(state["bad_queries"].keys())
+        new_bad_queries = set(bad_queries.keys())
+        fixed_queries = old_bad_queries - new_bad_queries
+        broken_queries = new_bad_queries - old_bad_queries
+        msg = None
+        if broken_queries:
+            # something new broke
+            msg = f":red_circle: Some queries are exceeding limits:"
+            for query in new_bad_queries:
+                qd = bad_queries[query]
+                msg += f"\n• {query} (Issue count {qd['issue_count']} exceeding limit of [{qd['limits']}])"
+        elif fixed_queries and not new_bad_queries:
+            # this is the first green run so let's let everyone know
+            msg = f":green_heart: All queries within limits again!"
+        if msg and os.environ.get('WEBHOOK_URL'):
+            r = requests.post(os.environ['WEBHOOK_URL'], json={"msg": msg})
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -251,10 +287,14 @@ if __name__ == "__main__":
                 print("\n".join(line for line in render_influxdb(data)))
             else:
                 initialize_md(data)
+                all_good, rows, bad_queries = render_table(data)
                 with open("index.md", "a") as md:
-                    all_good, rows = render_table(data)
                     for row in rows:
                         md.write("|".join(row) + "\n")
+                # open state.json from last run, see if anything changed and send webhook notification if needed
+                state = get_state()
+                trigger_webhook(state, bad_queries)
+                update_state(bad_queries)
     except FileNotFoundError:
         sys.exit("Configuration file {} not found".format(switches.config))
     if switches.exit_code and not all_good:
