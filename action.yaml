@@ -21,6 +21,10 @@ inputs:
   redmine_api_key:
     description: The Redmine API key
     required: true
+  webhook_url:
+    description: URL to a webhook to post a notification (e.g. for slack)
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -39,12 +43,22 @@ runs:
       shell: bash
     - run: sudo apt-get install -y kramdown weasyprint imagemagick ghostscript
       shell: bash
+    - name: Get previous published state
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.folder }}
+        path: ${{ inputs.folder }}
+        fetch-depth: '1'
+    - run: rm -rf ${{ inputs.folder }}/.git
+      shell: bash
     - name: Render Markdown from configured backlog queries
       run: |
         python backlogger/backlogger.py ${{ inputs.config }} ${{ inputs.args }}
         echo "BACKLOG_STATUS=$?" >> "$GITHUB_ENV"
       env:
         REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}
+        STATE_FOLDER: ${{ inputs.folder }}
+        WEBHOOK_URL: ${{ inputs.webhook_url }}
       shell: bash
       continue-on-error: true
     - name: Define variables
@@ -83,4 +97,7 @@ runs:
         # Remove workaround for already fixed CVE-2018-16509
         sudo sed -i '/rights="none" pattern="PDF"/d' /etc/ImageMagick-6/policy.xml
         weasyprint index.html - | convert - -trim ${{ env.PREVIEW_NAME }}
+      shell: bash
+    - name: Publish state json
+      run: cp state.json ${{ inputs.folder }}/
       shell: bash
