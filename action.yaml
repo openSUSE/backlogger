@@ -41,7 +41,7 @@ runs:
         python -m pip install --upgrade pip
         pip install -r backlogger/requirements.txt
       shell: bash
-    - run: sudo apt-get install -y kramdown weasyprint imagemagick ghostscript
+    - run: sudo apt-get update && sudo apt-get install -y kramdown weasyprint imagemagick ghostscript
       shell: bash
     - name: Get previous published state
       uses: actions/checkout@v4
