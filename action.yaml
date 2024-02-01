@@ -70,7 +70,7 @@ runs:
           preview="preview.png"
           echo "PREVIEW_NAME=$preview" >> "$GITHUB_ENV"
           echo "PREVIEW_URL=https://$org.github.io/$repo$extra/$preview?v=$preview_date" >> "$GITHUB_ENV"
-          if [ "${{ env.BACKLOG_STATUS }}" -eq 0 ]; then
+          if [ "${{ env.BACKLOG_STATUS }}" == 0 ]; then
             color="#55cc33"
           else
             color="#cc3333"
