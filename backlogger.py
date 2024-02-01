@@ -140,7 +140,7 @@ def render_table(data):
     return (all_good, rows, bad_queries)
 
 def remove_project_part_from_url(url):
-    return(re.sub("projects\/.*\/", "", url))
+    return(re.sub("projects/.*/", "", url))
 
 def cycle_time(issue, status_ids):
     start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
