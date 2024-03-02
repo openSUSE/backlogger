@@ -21,7 +21,10 @@ class TestOutput(unittest.TestCase):
     def test_influxdb(self):
         backlogger.json_rest = MagicMock(
             side_effect=[
-                {"issue_statuses": [{"name": "In Progress", "id": 2}]},
+                {"issue_statuses": [
+                    {"name": "In Progress", "id": 2},
+                    {"name": "Feedback", "id": 4}
+                ]},
                 {
                     "issues": [
                         {
@@ -38,18 +41,24 @@ class TestOutput(unittest.TestCase):
                         },
                         {
                             "id": 3,
+                            "status": {"name": "Feedback"},
+                            "created_on": "2022-12-06T00:00:00Z",
+                            "updated_on": "2022-12-14T00:00:00Z",
+                        },
+                        {
+                            "id": 4,
                             "status": {"name": "Resolved"},
                             "created_on": "2022-12-06T13:57:05Z",
                             "updated_on": "2022-12-22T13:12:22Z",
                         },
                         {
-                            "id": 4,
+                            "id": 5,
                             "status": {"name": "Resolved"},
                             "created_on": "2022-12-08T10:00:00Z",
                             "updated_on": "2022-12-15T10:00:00Z",
                         },
                     ],
-                    "total_count": 4,
+                    "total_count": 5,
                 },
                 {
                     "issue": {
@@ -98,6 +107,7 @@ class TestOutput(unittest.TestCase):
             backlogger.render_influxdb(backlogger.data),
             [
                 'slo,team="Awesome\\ Team",status="In\\ Progress",title="Workable\\ Backlog" count=2',
+                'slo,team="Awesome\\ Team",status="Feedback",title="Workable\\ Backlog" count=1',
                 'leadTime,team="Awesome\\ Team",status="Resolved",title="Workable\\ Backlog" count=2,leadTime=275.6273611111111,cycleTime=48.0,leadTimeSum=551.2547222222222,cycleTimeSum=96.0 23',
             ],
         )

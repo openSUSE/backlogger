@@ -145,17 +145,17 @@ def remove_project_part_from_url(url):
 def cycle_time(issue, status_ids):
     start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
     cycle_time = 0
-
+    in_cycle_status = [str(status_ids["In Progress"]), str(status_ids["Feedback"])]
     url = "{}/{}.json?include=journals".format(remove_project_part_from_url(data["web"]), issue["id"])
     issue = json_rest("GET", url)["issue"]
     for journal in issue["journals"]:
         for detail in journal["details"]:
             if detail["name"] == "status_id":
-                if detail["new_value"] == str(status_ids["In Progress"]):
+                if detail["new_value"] in in_cycle_status:
                     start = datetime.strptime(
                         journal["created_on"], "%Y-%m-%dT%H:%M:%SZ"
                     )
-                elif detail["old_value"] == str(status_ids["In Progress"]):
+                elif detail["old_value"] in in_cycle_status:
                     end = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
                     cycle_time += (end - start).total_seconds()
     return cycle_time
