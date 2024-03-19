@@ -275,7 +275,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output", choices=["markdown", "influxdb"], default="markdown"
     )
-    parser.add_argument("--reminder-comment-on-issues", action="store_false")
+    parser.add_argument("--reminder-comment-on-issues", action="store_true")
     parser.add_argument("--exit-code", action="store_true")
     switches = parser.parse_args()
     try:
