@@ -71,7 +71,9 @@ def issue_reminder(conf, poo):
         msg = conf["comment"]
     if data["reminder-comment-on-issues"]:
         if reminder_exists(conf, poo, msg):
+            print("Skipping reminder for {}: a similar reminder already exists".format(poo["id"]))
             return
+        print("Writing reminder for {}".format(poo["id"]))
         url = "{}/{}.json".format(data["web"], poo["id"])
         json_rest("PUT", url, {"issue": {"notes": msg}})
 
@@ -88,9 +90,14 @@ def list_issues(conf, root):
 
 
 def reminder_exists(conf, poo, msg):
-    url = "{}/{}.json".format(data["web"], poo["id"])
+    url = "{}/{}.json?include=journals".format(data["web"], poo["id"])
     root = json_rest("GET", url)
-    if root is not None and "journals" in root["issue"]:
+    if root is None:
+        # Redmine returns a 302 to the login page for some issues
+        # https://progress.opensuse.org/issues/157867
+        sys.stderr.write("API for {} returned None, skipping reminder".format(poo["id"]))
+        return True
+    if "journals" in root["issue"]:
         journals = root["issue"]["journals"]
         for journal in journals:
             if not "notes" in journal or len(journal["notes"]) == 0:

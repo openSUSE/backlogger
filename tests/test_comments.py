@@ -1,6 +1,8 @@
 import os
 import sys
 import unittest
+import pytest
+import re
 from unittest.mock import MagicMock, call
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -9,11 +11,26 @@ import backlogger
 
 
 class TestComments(unittest.TestCase):
+
+    @pytest.fixture(autouse=True)
+    def capsys(self, capsys):
+        self.capsys = capsys
+
+
     def test_comments(self):
         data = {"url": "https://example.com/issues", "web": "https://example.com/wiki",
                 "reminder-comment-on-issues": True}
         backlogger.data = data
-        backlogger.json_rest = MagicMock(return_value=None)
+        rest = {
+            "issue": {
+                "id": 1000,
+                "priority": { "id": 6, "name": "Urgent" },
+                "journals": [
+                    { "id": 1, "notes": "" },
+                ],
+            },
+        }
+        backlogger.json_rest = MagicMock(return_value=rest)
         backlogger.list_issues(
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"issues": [{"priority": {"name": "High"}, "id": 123}], "total_count": 1},
@@ -25,7 +42,7 @@ class TestComments(unittest.TestCase):
         calls = [
             call(
                 "GET",
-                "https://example.com/wiki/123.json",
+                "https://example.com/wiki/123.json?include=journals",
             ),
             call(
                 "PUT",
@@ -38,7 +55,6 @@ class TestComments(unittest.TestCase):
             ),
         ]
         backlogger.json_rest.assert_has_calls(calls)
-
 
     def test_no_repeat(self):
         data = {"url": "https://example.com/issues", "web": "https://example.com/wiki",
@@ -66,5 +82,21 @@ class TestComments(unittest.TestCase):
         )
         backlogger.json_rest.assert_called_once_with(
             "GET",
-            "https://example.com/wiki/1000.json",
+            "https://example.com/wiki/1000.json?include=journals",
         )
+        out, err = self.capsys.readouterr()
+        assert re.match("Skipping reminder for 1000", out)
+
+
+    def test_empty_issue(self):
+        backlogger.json_rest = MagicMock(return_value=None)
+        backlogger.issue_reminder(
+            {"query": "query_id=123&c%5B%5D=updated_on"},
+            {"priority": {"name": "High"}, "id": 1000},
+        )
+        backlogger.json_rest.assert_called_once_with(
+            "GET",
+            "https://example.com/wiki/1000.json?include=journals",
+        )
+        out, err = self.capsys.readouterr()
+        assert re.match("API for 1000 returned None", err)
