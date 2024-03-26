@@ -93,8 +93,6 @@ def reminder_exists(conf, poo, msg):
     url = "{}/{}.json?include=journals".format(data["web"], poo["id"])
     root = json_rest("GET", url)
     if root is None:
-        # Redmine returns a 302 to the login page for some issues
-        # https://progress.opensuse.org/issues/157867
         sys.stderr.write("API for {} returned None, skipping reminder".format(poo["id"]))
         return True
     if "journals" in root["issue"]:
