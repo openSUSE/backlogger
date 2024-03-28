@@ -56,6 +56,7 @@ class TestComments(unittest.TestCase):
         ]
         backlogger.json_rest.assert_has_calls(calls)
 
+
     def test_no_repeat(self):
         data = {"url": "https://example.com/issues", "web": "https://example.com/wiki",
                 "api": "https://example.com/issues.json",
@@ -67,8 +68,9 @@ class TestComments(unittest.TestCase):
                 "priority": { "id": 6, "name": "Urgent" },
                 "journals": [
                     { "id": 1, "notes": "" },
+                    { "id": 2, "notes": None },
                     {
-                        "id": 2,
+                        "id": 3,
                         "notes": "This ticket was set to **High** priority but was not updated [within the SLO period](https://example.com/issues). Please consider picking up this ticket or just set the ticket to the next lower priority.",
                     },
                 ],
