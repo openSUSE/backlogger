@@ -98,7 +98,7 @@ def reminder_exists(conf, poo, msg):
     if "journals" in root["issue"]:
         journals = root["issue"]["journals"]
         for journal in journals:
-            if not "notes" in journal or len(journal["notes"]) == 0:
+            if journal.get("notes", None) is None or len(journal["notes"]) == 0:
                 continue
             if re.search(reminder_regex, journal["notes"]):
                 return True
