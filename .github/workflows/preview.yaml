@@ -3,25 +3,23 @@ name: Backlog Limits Checker
 concurrency: preview-${{ github.ref }}
 # yamllint disable-line rule:truthy
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - reopened
       - synchronize
       - closed
-permissions:
-  contents: write
-  pull-requests: write
 jobs:
-  backlogger:
+  backlogger_preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Run the action implemented in this repo
         uses: ./
         with:
           config: queries.yaml
-          redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
       - uses: rossjrw/pr-preview-action@v1
         with:
           source-dir: gh-pages
