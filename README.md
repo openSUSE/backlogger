@@ -40,6 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: openSUSE/backlogger@main
+        with:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
           args: --reminder-comment-on-issues
       - uses: JamesIves/github-pages-deploy-action@v4
