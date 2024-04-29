@@ -54,7 +54,7 @@ runs:
       shell: bash
     - name: Render Markdown from configured backlog queries
       run: |
-        python backlogger/backlogger.py ${{ inputs.config }} ${{ inputs.args }}
+        python backlogger/backlogger.py backlogger/${{ inputs.config }} ${{ inputs.args }}
         echo "BACKLOG_STATUS=$?" >> "$GITHUB_ENV"
       env:
         REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}

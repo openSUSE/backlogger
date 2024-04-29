@@ -1,6 +1,6 @@
 api: https://progress.opensuse.org/issues.json
 web: https://progress.opensuse.org/issues
-team: Example
+team: E.G.
 url: http://example.com
 queries:
   - title: Workable Backlog
@@ -16,7 +16,8 @@ queries:
     max: 0
   - title: In Feedback
     query: query_id=520
-    max: 30
-    min: 1
-  - title: Closed yesterday
+    max: 10
+    min: 0
+  - title: Closed the day before today
     query: query_id=773
+    max: 1
