@@ -9,18 +9,17 @@ on:
       - reopened
       - synchronize
       - closed
+    branches:
+      - "**"
 jobs:
   backlogger_preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
       - name: Run the action implemented in this repo
         uses: ./
         with:
           config: queries.yaml
-          ref: ${{ github.event.pull_request.head.sha }}
       - uses: rossjrw/pr-preview-action@v1
         with:
           source-dir: gh-pages
