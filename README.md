@@ -74,6 +74,13 @@ jobs:
       - uses: rossjrw/pr-preview-action@v1
 ```
 
+> [!NOTE]
+> rossjrw/pr-preview-action does not work in version 1 with forked repositories.
+> `backlogger_preview` is triggered by *pull_request_targer* to run CI from
+> forked. As a side effect changes in queries.yaml are not reflect to the
+> dashboard.
+
+
 ## License
 
 This project is licensed under the MIT license, see LICENSE file for details.
