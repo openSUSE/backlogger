@@ -54,12 +54,14 @@ jobs:
 ```yaml
 concurrency: preview-${{ github.ref }}
 on:
-  pull_request:
+  pull_request_target:
     types:
       - opened
       - reopened
       - synchronize
       - closed
+    branches:
+      - "**"
 permissions:
   contents: write
   pull-requests: write
@@ -73,6 +75,12 @@ jobs:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
       - uses: rossjrw/pr-preview-action@v1
 ```
+
+> [!NOTE]
+> [rossjrw/pr-preview-action](https://github.com/rossjrw/pr-preview-action)
+> doesn't support forked repositories.
+> Note the use of `pull_request_target` and `branches` as a
+> work-around with the caveat that previews only show HTML changes.
 
 ## License
 
