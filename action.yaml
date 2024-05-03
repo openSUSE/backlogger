@@ -18,6 +18,10 @@ inputs:
     description: Output folder for HTML files
     required: false
     default: 'gh-pages'
+  state:
+    description: Output folder for state keeping
+    required: false
+    default: 'state'
   redmine_api_key:
     description: The Redmine API key
     required: true
@@ -48,9 +52,12 @@ runs:
       uses: actions/checkout@v4
       with:
         ref: ${{ inputs.folder }}
-        path: ${{ inputs.folder }}
-        fetch-depth: '1'
-    - run: rm -rf ${{ inputs.folder }}/.git
+        path: ${{ inputs.state }}
+        # https://github.com/actions/checkout#fetch-only-a-single-file
+        sparse-checkout: |
+          state.json
+        sparse-checkout-cone-mode: false
+    - run: rm -rf ${{ inputs.state }}/.git
       shell: bash
     - name: Render Markdown from configured backlog queries
       run: |
@@ -58,7 +65,7 @@ runs:
         echo "BACKLOG_STATUS=$?" >> "$GITHUB_ENV"
       env:
         REDMINE_API_KEY: ${{ inputs.REDMINE_API_KEY }}
-        STATE_FOLDER: ${{ inputs.folder }}
+        STATE_FOLDER: ${{ inputs.state }}
         WEBHOOK_URL: ${{ inputs.webhook_url }}
       shell: bash
       continue-on-error: true
