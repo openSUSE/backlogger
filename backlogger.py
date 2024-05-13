@@ -6,6 +6,7 @@ import json
 from statistics import mean
 from datetime import datetime, timedelta
 from inspect import getmembers, isfunction
+import calendar
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -20,6 +21,17 @@ reminder_text = "This ticket was set to **{priority}** priority but was not upda
 reminder_regex = (
     r"^This ticket was set to .* priority but was not updated.* Please consider"
 )
+
+present = datetime.now()
+slo_priorities = {
+    "Immediate": {"period": timedelta(days=1),
+                  "next_priority": {"id": 6, "name": "Urgent"}}, #or <1 day for all subprojects of qa
+    "Urgent": {"period": timedelta(weeks=1),
+               "next_priority": {"id": 5, "name": "High"}}, #or <1 day for all subprojects of qa
+    "High": {"period": timedelta(days=calendar.monthrange(present.year, present.month)[1]),
+             "next_priority": {"id": 4, "name": "Normal"}},
+    "Normal": {"period": timedelta(days=sum([calendar.monthrange(present.year, m)[1] for m in range(1,13)])),
+               "next_priority": {"id": 3, "name": "Low"}}}
 
 
 # Initialize a blank md file to replace the current README
@@ -64,44 +76,80 @@ def json_rest(method, url, rest=None):
     return r.json() if r.text else None
 
 
-def issue_reminder(conf, poo):
+def issue_reminder(conf, poo, poo_reminder_state):
     priority = poo["priority"]["name"]
-    msg = reminder_text.format(priority=priority, url=data["url"])
+    if data["reminder-comment-on-issues"]:
+        journals = retrieve_journals(poo)
+        if journals is None:
+            sys.stderr.write(
+                "API for {} returned None, skipping reminder".format(poo["id"]))
+            return
+        elif reminder_exists(poo, journals, poo_reminder_state):
+            print("Skipping reminder for {}: a similar reminder already exists".format(poo["id"]))
+            if priority == "Low" and poo_reminder_state['has_repeat_reminder']:
+                print("Skipping priority update for {}, already at lowest".format(poo["id"]))
+                return
+            _update_issue_priority(poo["id"], priority, poo_reminder_state)
+            return
+        _send_first_reminder(poo["id"], priority, conf)
+
+
+def _send_first_reminder(poo_id, priority_current, conf):
+    msg = reminder_text.format(priority=priority_current, url=data["url"])
     if "comment" in conf:
         msg = conf["comment"]
-    if data["reminder-comment-on-issues"]:
-        if reminder_exists(conf, poo, msg):
-            print("Skipping reminder for {}: a similar reminder already exists".format(poo["id"]))
-            return
-        print("Writing reminder for {}".format(poo["id"]))
-        url = "{}/{}.json".format(data["web"], poo["id"])
-        json_rest("PUT", url, {"issue": {"notes": msg}})
+    print("Writing reminder for {}".format(poo_id))
+    url = "{}/{}.json".format(data["web"], poo_id)
+    json_rest("PUT", url, {"issue": {"notes": msg}})
+
+
+def _update_issue_priority(poo_id, priority_current, poo_reminder_state):
+    if poo_reminder_state['has_repeat_reminder'] and (poo_reminder_state['last_reminder'] + slo_priorities[priority_current]["period"]) < present:
+            
+        msg = "No response to reminder. Reducing priority from {} to next lower {} for {}"
+        print(msg.format(priority_current,
+                         slo_priorities[priority_current]["next_priority"]["name"],
+                         poo_id))
+        url = "{}/{}.json".format(data["web"], poo_id)
+        json_rest("PUT", url,
+                  {"issue":
+                   {"priority_id": slo_priorities[priority_current]["next_priority"]["id"],
+                    "notes": "The ticket will be set to the next lower priority {}".format(
+                        slo_priorities[priority_current]["next_priority"]["name"])}})
 
 
 def list_issues(conf, root):
     try:
         for poo in root["issues"]:
+            poo_reminder_state = {'last_reminder': datetime.min,
+                                  'has_repeat_reminder': False}
             if "updated_on" in conf["query"]:
-                issue_reminder(conf, poo)
+                issue_reminder(conf, poo, poo_reminder_state)
     except KeyError:
         print("There was an error retrieving the issues " + conf["title"])
     else:
         return int(root["total_count"])
 
 
-def reminder_exists(conf, poo, msg):
+def retrieve_journals(poo):
     url = "{}/{}.json?include=journals".format(data["web"], poo["id"])
     root = json_rest("GET", url)
     if root is None:
-        sys.stderr.write("API for {} returned None, skipping reminder".format(poo["id"]))
-        return True
+        return None
     if "journals" in root["issue"]:
-        journals = root["issue"]["journals"]
-        for journal in journals:
-            if journal.get("notes", None) is None or len(journal["notes"]) == 0:
-                continue
-            if re.search(reminder_regex, journal["notes"]):
-                return True
+        return root["issue"]["journals"]
+    return None
+
+
+def reminder_exists(poo, journals, state):
+    for journal in journals:
+        if journal.get("notes", None) is None or len(journal["notes"]) == 0:
+            continue
+        if re.search(reminder_regex, journal["notes"]):
+            state['last_reminder'] = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+            state['has_repeat_reminder'] = True
+            return True
+    state['has_repeat_reminder'] = False
     return False
 
 
@@ -144,8 +192,10 @@ def render_table(data):
             bad_queries[conf['title']] = {"url": url, "issue_count": issue_count, "limits": limits}
     return (all_good, rows, bad_queries)
 
+
 def remove_project_part_from_url(url):
     return(re.sub("projects/.*/", "", url))
+
 
 def cycle_time(issue, status_ids):
     start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
