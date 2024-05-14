@@ -115,11 +115,13 @@ class TestComments(unittest.TestCase):
             ["Urgent", "High", 6, 25],
             ["High", "Normal", 5, 35],
             ["Normal", "Low", 4, 700]]
+        expected_str = "Reducing priority from {} to next lower {} for 1000"
         for params in test_params:
             with self.subTest(params):
                 self._set_mock_data(params)
                 out, err = self.capsys.readouterr()
-                assert re.search("Reducing priority from {} to next lower {} for 1000".format(params[0],params[1]), out)
+                assert re.search(expected_str.format(params[0],
+                                                     params[1]), out)
 
 
     def test_issue_with_low_priority_never_change(self):
