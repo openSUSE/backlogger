@@ -18,6 +18,7 @@ import re
 # Icons used for PASS or FAIL in the md file
 result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
 reminder_text = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority."
+update_slo_text = "The ticket will be set to the next lower priority **{priority}**."
 reminder_regex = (
     r"^This ticket was set to .* priority but was not updated.* Please consider"
 )
@@ -78,6 +79,9 @@ def json_rest(method, url, rest=None):
 
 def issue_reminder(conf, poo, poo_reminder_state):
     priority = poo["priority"]["name"]
+    msg = reminder_text.format(priority=priority, url=data["url"])
+    if "comment" in conf:
+        msg = conf["comment"]
     if data["reminder-comment-on-issues"]:
         journals = retrieve_journals(poo)
         if journals is None:
@@ -89,33 +93,30 @@ def issue_reminder(conf, poo, poo_reminder_state):
             if priority == "Low" and poo_reminder_state['has_repeat_reminder']:
                 print("Skipping priority update for {}, already at lowest".format(poo["id"]))
                 return
-            _update_issue_priority(poo["id"], priority, poo_reminder_state)
+            _update_issue_priority(poo["id"], priority, poo_reminder_state, msg)
             return
-        _send_first_reminder(poo["id"], priority, conf)
+        _send_first_reminder(poo["id"], msg)
 
 
-def _send_first_reminder(poo_id, priority_current, conf):
-    msg = reminder_text.format(priority=priority_current, url=data["url"])
-    if "comment" in conf:
-        msg = conf["comment"]
+def _send_first_reminder(poo_id, msg):
     print("Writing reminder for {}".format(poo_id))
     url = "{}/{}.json".format(data["web"], poo_id)
     json_rest("PUT", url, {"issue": {"notes": msg}})
 
 
-def _update_issue_priority(poo_id, priority_current, poo_reminder_state):
+def _update_issue_priority(poo_id, priority_current, poo_reminder_state, msg):
     if poo_reminder_state['has_repeat_reminder'] and (poo_reminder_state['last_reminder'] + slo_priorities[priority_current]["period"]) < present:
-            
-        msg = "No response to reminder. Reducing priority from {} to next lower {} for {}"
-        print(msg.format(priority_current,
+        note = "No response to reminder. Reducing priority from {} to next lower {} for {}"
+        print(note.format(priority_current,
                          slo_priorities[priority_current]["next_priority"]["name"],
                          poo_id))
         url = "{}/{}.json".format(data["web"], poo_id)
+        msg = " ".join(update_slo_text.format(
+            priority=slo_priorities[priority_current]["next_priority"]["name"]))
         json_rest("PUT", url,
                   {"issue":
                    {"priority_id": slo_priorities[priority_current]["next_priority"]["id"],
-                    "notes": "The ticket will be set to the next lower priority {}".format(
-                        slo_priorities[priority_current]["next_priority"]["name"])}})
+                    "notes": msg}})
 
 
 def list_issues(conf, root):
@@ -146,7 +147,8 @@ def reminder_exists(poo, journals, state):
         if journal.get("notes", None) is None or len(journal["notes"]) == 0:
             continue
         if re.search(reminder_regex, journal["notes"]):
-            state['last_reminder'] = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+            state['last_reminder'] = datetime.strptime(journal["created_on"],
+                                                       "%Y-%m-%dT%H:%M:%SZ")
             state['has_repeat_reminder'] = True
             return True
     state['has_repeat_reminder'] = False
