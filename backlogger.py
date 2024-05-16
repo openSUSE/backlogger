@@ -111,8 +111,8 @@ def _update_issue_priority(poo_id, priority_current, poo_reminder_state, msg):
                          slo_priorities[priority_current]["next_priority"]["name"],
                          poo_id))
         url = "{}/{}.json".format(data["web"], poo_id)
-        msg = " ".join(update_slo_text.format(
-            priority=slo_priorities[priority_current]["next_priority"]["name"]))
+        msg = " ".join([reminder_text, update_slo_text.format(
+            priority=slo_priorities[priority_current]["next_priority"]["name"])])
         json_rest("PUT", url,
                   {"issue":
                    {"priority_id": slo_priorities[priority_current]["next_priority"]["id"],
