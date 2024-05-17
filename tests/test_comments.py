@@ -133,7 +133,7 @@ class TestComments(unittest.TestCase):
                 {
                     "issue": {
                         "priority_id": 3,
-                        "notes": "This ticket was set to **Normal** priority but was not updated [within the SLO period](https://example.com/issues). Please consider picking up this ticket or just set the ticket to the next lower priority. The ticket will be set to the next lower priority **Low**."
+                        "notes": "This ticket was set to **Normal** priority but was not updated [within the SLO period](https://example.com/issues). The ticket will be set to the next lower priority **Low**."
                     }
                 },
             ),
