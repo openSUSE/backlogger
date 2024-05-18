@@ -122,6 +122,23 @@ class TestComments(unittest.TestCase):
                 out, err = self.capsys.readouterr()
                 assert re.search(expected_str.format(params[0],
                                                      params[1]), out)
+        calls = [
+            call(
+                "GET",
+                "https://example.com/wiki/1000.json?include=journals",
+            ),
+            call(
+                "PUT",
+                "https://example.com/wiki/1000.json",
+                {
+                    "issue": {
+                        "priority_id": 3,
+                        "notes": "This ticket was set to **Normal** priority but was not updated [within the SLO period](https://example.com/issues). The ticket will be set to the next lower priority **Low**."
+                    }
+                },
+            ),
+        ]
+        backlogger.json_rest.assert_has_calls(calls)
 
 
     def test_issue_with_low_priority_never_change(self):

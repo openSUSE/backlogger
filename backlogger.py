@@ -17,7 +17,8 @@ import re
 
 # Icons used for PASS or FAIL in the md file
 result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
-reminder_text = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url}). Please consider picking up this ticket or just set the ticket to the next lower priority."
+reminder_text_common = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url})."
+reminder_text = "Please consider picking up this ticket or just set the ticket to the next lower priority."
 update_slo_text = "The ticket will be set to the next lower priority **{priority}**."
 reminder_regex = (
     r"^This ticket was set to .* priority but was not updated.* Please consider"
@@ -79,7 +80,7 @@ def json_rest(method, url, rest=None):
 
 def issue_reminder(conf, poo, poo_reminder_state):
     priority = poo["priority"]["name"]
-    msg = reminder_text.format(priority=priority, url=data["url"])
+    msg = " ".join([reminder_text_common.format(priority=priority, url=data["url"]), reminder_text])
     if "comment" in conf:
         msg = conf["comment"]
     if data["reminder-comment-on-issues"]:
@@ -111,8 +112,8 @@ def _update_issue_priority(poo_id, priority_current, poo_reminder_state, msg):
                          slo_priorities[priority_current]["next_priority"]["name"],
                          poo_id))
         url = "{}/{}.json".format(data["web"], poo_id)
-        msg = " ".join(update_slo_text.format(
-            priority=slo_priorities[priority_current]["next_priority"]["name"]))
+        msg = " ".join([reminder_text_common.format(priority=priority_current, url=data["url"]), update_slo_text.format(
+            priority=slo_priorities[priority_current]["next_priority"]["name"])])
         json_rest("PUT", url,
                   {"issue":
                    {"priority_id": slo_priorities[priority_current]["next_priority"]["id"],
