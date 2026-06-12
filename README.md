@@ -38,7 +38,7 @@ jobs:
   backlogger:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       - uses: openSUSE/backlogger@main
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
           args: --reminder-comment-on-issues
@@ -66,7 +66,7 @@ jobs:
   backlogger:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
       - uses: openSUSE/backlogger@main
         with:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
