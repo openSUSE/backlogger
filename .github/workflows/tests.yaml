@@ -16,6 +16,8 @@ jobs:
           pip install -r requirements.txt
       - run: pytest -vv
       - name: Install Telegraf
-        run: sudo apt-get install -y telegraf
+        run: |
+          wget -q https://dl.influxdata.com/telegraf/releases/telegraf_1.31.0-1_amd64.deb
+          sudo dpkg -i telegraf_1.31.0-1_amd64.deb
       - name: Test InfluxDB output
         run: telegraf --test --config tests/slo.conf
