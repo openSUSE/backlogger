@@ -33,12 +33,12 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         repository: openSUSE/backlogger
         path: backlogger
         ref: ${{ github.event.pull_request.head.sha }}
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: 3.12
     - name: Install Python dependencies
@@ -49,7 +49,7 @@ runs:
     - run: sudo apt-get update && sudo apt-get install -y kramdown weasyprint imagemagick ghostscript
       shell: bash
     - name: Get previous published state
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         ref: ${{ inputs.folder }}
         path: ${{ inputs.state }}
