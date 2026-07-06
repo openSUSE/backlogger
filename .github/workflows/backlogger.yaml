@@ -11,13 +11,13 @@ jobs:
   backlogger:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6
       - name: Run the action implemented in this repo
         uses: ./
         with:
           config: queries.yaml
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
-      - uses: JamesIves/github-pages-deploy-action@v4
+      - uses: JamesIves/github-pages-deploy-action@d92aa235d04922e8f08b40ce78cc5442fcfbfa2f  # v4
         with:
           folder: gh-pages
           clean-exclude: pr-preview
