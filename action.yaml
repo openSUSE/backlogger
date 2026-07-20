@@ -38,7 +38,7 @@ runs:
         repository: openSUSE/backlogger
         path: backlogger
         ref: ${{ github.event.pull_request.head.sha }}
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v6.3.0
       with:
         python-version: 3.12
     - name: Install Python dependencies
