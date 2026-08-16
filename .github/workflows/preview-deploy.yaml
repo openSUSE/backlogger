@@ -13,6 +13,9 @@ jobs:
     # yamllint disable-line rule:line-length
     if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
     steps:
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
       - name: Download PR info
         # yamllint disable-line rule:line-length
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
@@ -38,9 +41,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: gh-pages
 
-      # yamllint disable-line rule:line-length
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-
       - name: Deploy Preview
         # yamllint disable-line rule:line-length
         uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9  # v1
@@ -48,5 +48,6 @@ jobs:
           source-dir: gh-pages
           # yamllint disable-line rule:line-length
           action: ${{ steps.pr-info.outputs.action == 'closed' && 'remove' || 'deploy' }}
+          pr-number: ${{ steps.pr-info.outputs.number }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
