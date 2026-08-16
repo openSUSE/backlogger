@@ -42,6 +42,7 @@ jobs:
           path: gh-pages
 
       - name: Deploy Preview
+        id: preview-step
         # yamllint disable-line rule:line-length
         uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9  # v1
         with:
@@ -49,5 +50,36 @@ jobs:
           # yamllint disable-line rule:line-length
           action: ${{ steps.pr-info.outputs.action == 'closed' && 'remove' || 'deploy' }}
           pr-number: ${{ steps.pr-info.outputs.number }}
+          comment: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on PR (deploy)
+        if: steps.pr-info.outputs.action != 'closed'
+        # yamllint disable-line rule:line-length
+        uses: marocchino/sticky-pull-request-comment@67d0dec7b07ed060a405f9b2a64b8ab319fdd7db  # v2
+        with:
+          header: pr-preview
+          number: ${{ steps.pr-info.outputs.number }}
+          # yamllint disable rule:line-length
+          message: |
+            [PR Preview Action](https://github.com/rossjrw/pr-preview-action) ${{ steps.preview-step.outputs.action-version }}
+            :---:
+            | <p><img src="https://qr.rossjrw.com/?url=${{ steps.preview-step.outputs.preview-url }}" height="100" align="right" alt="QR code for preview link"></p> :rocket: View preview at <br> ${{ steps.preview-step.outputs.preview-url }} <br><br>
+            | <h6>Built to branch [`gh-pages`](https://github.com/okurz/backlogger/tree/gh-pages) at ${{ steps.preview-step.outputs.action-start-time }}. <br> Preview will be ready when the [GitHub Pages deployment](https://github.com/okurz/backlogger/deployments) is complete. <br><br> </h6>
+          # yamllint enable rule:line-length
+
+      - name: Comment on PR (remove)
+        if: steps.pr-info.outputs.action == 'closed'
+        # yamllint disable-line rule:line-length
+        uses: marocchino/sticky-pull-request-comment@67d0dec7b07ed060a405f9b2a64b8ab319fdd7db  # v2
+        with:
+          header: pr-preview
+          number: ${{ steps.pr-info.outputs.number }}
+          # yamllint disable rule:line-length
+          message: |
+            [PR Preview Action](https://github.com/rossjrw/pr-preview-action) ${{ steps.preview-step.outputs.action-version }}
+            :---:
+            Preview removed because the pull request was closed.
+            ${{ steps.preview-step.outputs.action-start-time }}
+          # yamllint enable rule:line-length
