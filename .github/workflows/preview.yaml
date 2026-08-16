@@ -1,9 +1,9 @@
 ---
-name: Backlog Limits Checker
+name: Backlog Limits Checker Build
 concurrency: preview-${{ github.ref }}
 # yamllint disable-line rule:truthy
 on:
-  pull_request_target:
+  pull_request:
     types:
       - opened
       - reopened
@@ -12,16 +12,33 @@ on:
     branches:
       - "**"
 jobs:
-  backlogger_preview:
+  backlogger_preview_build:
     runs-on: ubuntu-latest
     steps:
+      # yamllint disable-line rule:line-length
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
-        with:
-          allow-unsafe-pr-checkout: true
+
       - name: Run the action implemented in this repo
+        if: github.event.action != 'closed'
         uses: ./
         with:
           config: queries.yaml
-      - uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9  # v1
+
+      - name: Save PR info
+        run: |
+          mkdir -p pr-info
+          echo "${{ github.event.number }}" > pr-info/pr-number
+          echo "${{ github.event.action }}" > pr-info/pr-action
+
+      - name: Upload PR info
+        uses: actions/upload-artifact@v4
         with:
-          source-dir: gh-pages
+          name: pr-info
+          path: pr-info/
+
+      - name: Upload preview artifact
+        if: github.event.action != 'closed'
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-artifact
+          path: gh-pages/

@@ -1,0 +1,50 @@
+---
+name: Backlog Limits Checker Deploy
+concurrency: preview-deploy-${{ github.ref }}
+# yamllint disable-line rule:truthy
+on:
+  workflow_run:
+    workflows: ["Backlog Limits Checker Build"]
+    types:
+      - completed
+jobs:
+  backlogger_preview_deploy:
+    runs-on: ubuntu-latest
+    # yamllint disable-line rule:line-length
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Download PR info
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          name: pr-info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: pr-info
+
+      - name: Read PR info
+        id: pr-info
+        run: |
+          echo "number=$(cat pr-info/pr-number)" >> "$GITHUB_OUTPUT"
+          echo "action=$(cat pr-info/pr-action)" >> "$GITHUB_OUTPUT"
+
+      - name: Download preview artifact
+        if: steps.pr-info.outputs.action != 'closed'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          name: preview-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: gh-pages
+
+      # yamllint disable-line rule:line-length
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Deploy Preview
+        # yamllint disable-line rule:line-length
+        uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9  # v1
+        with:
+          source-dir: gh-pages
+          # yamllint disable-line rule:line-length
+          action: ${{ steps.pr-info.outputs.action == 'closed' && 'remove' || 'deploy' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
