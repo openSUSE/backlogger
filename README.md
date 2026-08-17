@@ -51,36 +51,101 @@ jobs:
 
 ## Previews for pull requests
 
+To securely generate and deploy previews for pull requests (including those from forks), use a secure two-workflow "Build and Deploy" pattern.
+
+### 1. Build Workflow
+
+Create `.github/workflows/preview-build.yml` triggered on the `pull_request` event:
+
 ```yaml
+name: Preview Build
 concurrency: preview-${{ github.ref }}
 on:
-  pull_request_target:
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - closed
-    branches:
-      - "**"
-permissions:
-  contents: write
-  pull-requests: write
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
 jobs:
-  backlogger:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: openSUSE/backlogger@main
+      - uses: actions/checkout@v4
+      - name: Run backlogger
+        if: github.event.action != 'closed'
+        uses: openSUSE/backlogger@main
         with:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
-      - uses: rossjrw/pr-preview-action@v1
+      - name: Save PR info
+        run: |
+          mkdir -p pr-info
+          echo "${{ github.event.number }}" > pr-info/pr-number
+          echo "${{ github.event.action }}" > pr-info/pr-action
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pr-info
+          path: pr-info/
+      - name: Upload preview artifact
+        if: github.event.action != 'closed'
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-artifact
+          path: gh-pages/
 ```
 
-> [!NOTE]
-> [rossjrw/pr-preview-action](https://github.com/rossjrw/pr-preview-action)
-> doesn't support forked repositories.
-> Note the use of `pull_request_target` and `branches` as a
-> work-around with the caveat that previews only show HTML changes.
+### 2. Deploy Workflow
+
+Create `.github/workflows/preview-deploy.yml` triggered on the `workflow_run` event:
+
+```yaml
+name: Preview Deploy
+on:
+  workflow_run:
+    workflows: ["Preview Build"]
+    types: [completed]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download PR info
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          name: pr-info
+          path: pr-info
+      - id: pr-info
+        run: |
+          echo "number=$(cat pr-info/pr-number)" >> "$GITHUB_OUTPUT"
+          echo "action=$(cat pr-info/pr-action)" >> "$GITHUB_OUTPUT"
+      - name: Download preview
+        if: steps.pr-info.outputs.action != 'closed'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          name: preview-artifact
+          path: gh-pages
+      - uses: rossjrw/pr-preview-action@v1
+        id: preview-step
+        with:
+          source-dir: gh-pages
+          action: ${{ steps.pr-info.outputs.action == 'closed' && 'remove' || 'deploy' }}
+          pr-number: ${{ steps.pr-info.outputs.number }}
+          comment: false
+      - name: Comment on PR (deploy)
+        if: steps.pr-info.outputs.action != 'closed'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-preview
+          number: ${{ steps.pr-info.outputs.number }}
+          message: |
+            View preview at: ${{ steps.preview-step.outputs.preview-url }}
+      - name: Comment on PR (remove)
+        if: steps.pr-info.outputs.action == 'closed'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: pr-preview
+          number: ${{ steps.pr-info.outputs.number }}
+          message: Preview removed because the pull request was closed.
+```
 
 ## License
 
