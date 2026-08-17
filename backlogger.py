@@ -39,7 +39,7 @@ slo_priorities = {
 # Initialize a blank md file to replace the current README
 def initialize_md(data):
     with open("index.md", "w") as md:
-        md.write("# Backlog Status\n\n")
+        md.write("# Backlog Status DEMO PR\n\n")
         md.write(
             "This is the dashboard for [{}]({}).\n".format(data["team"], data["url"])
         )
