@@ -4,7 +4,7 @@ import os
 import sys
 import json
 from statistics import mean
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from inspect import getmembers, isfunction
 import calendar
 import requests
@@ -26,14 +26,25 @@ reminder_regex = (
 
 present = datetime.now()
 slo_priorities = {
-    "Immediate": {"period": timedelta(days=1),
-                  "next_priority": {"id": 6, "name": "Urgent"}}, #or <1 day for all subprojects of qa
-    "Urgent": {"period": timedelta(weeks=1),
-               "next_priority": {"id": 5, "name": "High"}}, #or <1 day for all subprojects of qa
-    "High": {"period": timedelta(days=calendar.monthrange(present.year, present.month)[1]),
-             "next_priority": {"id": 4, "name": "Normal"}},
-    "Normal": {"period": timedelta(days=sum([calendar.monthrange(present.year, m)[1] for m in range(1,13)])),
-               "next_priority": {"id": 3, "name": "Low"}}}
+    "Immediate": {
+        "period": timedelta(days=1),
+        "next_priority": {"id": 6, "name": "Urgent"},
+    },  # or <1 day for all subprojects of qa
+    "Urgent": {
+        "period": timedelta(weeks=1),
+        "next_priority": {"id": 5, "name": "High"},
+    },  # or <1 day for all subprojects of qa
+    "High": {
+        "period": timedelta(days=calendar.monthrange(present.year, present.month)[1]),
+        "next_priority": {"id": 4, "name": "Normal"},
+    },
+    "Normal": {
+        "period": timedelta(
+            days=sum([calendar.monthrange(present.year, m)[1] for m in range(1, 13)])
+        ),
+        "next_priority": {"id": 3, "name": "Low"},
+    },
+}
 
 
 # Initialize a blank md file to replace the current README
@@ -80,19 +91,30 @@ def json_rest(method, url, rest=None):
 
 def issue_reminder(conf, poo, poo_reminder_state):
     priority = poo["priority"]["name"]
-    msg = " ".join([reminder_text_common.format(priority=priority, url=data["url"]), reminder_text])
+    msg = " ".join(
+        [reminder_text_common.format(priority=priority, url=data["url"]), reminder_text]
+    )
     if "comment" in conf:
         msg = conf["comment"]
     if data["reminder-comment-on-issues"]:
         journals = retrieve_journals(poo)
         if journals is None:
             sys.stderr.write(
-                "API for {} returned None, skipping reminder".format(poo["id"]))
+                "API for {} returned None, skipping reminder".format(poo["id"])
+            )
             return
         elif reminder_exists(poo, journals, poo_reminder_state):
-            print("Skipping reminder for {}: a similar reminder already exists".format(poo["id"]))
-            if priority == "Low" and poo_reminder_state['has_repeat_reminder']:
-                print("Skipping priority update for {}, already at lowest".format(poo["id"]))
+            print(
+                "Skipping reminder for {}: a similar reminder already exists".format(
+                    poo["id"]
+                )
+            )
+            if priority == "Low" and poo_reminder_state["has_repeat_reminder"]:
+                print(
+                    "Skipping priority update for {}, already at lowest".format(
+                        poo["id"]
+                    )
+                )
                 return
             _update_issue_priority(poo["id"], priority, poo_reminder_state, msg)
             return
@@ -106,25 +128,54 @@ def _send_first_reminder(poo_id, msg):
 
 
 def _update_issue_priority(poo_id, priority_current, poo_reminder_state, msg):
-    if poo_reminder_state['has_repeat_reminder'] and (poo_reminder_state['last_reminder'] + slo_priorities[priority_current]["period"]) < present:
-        note = "No response to reminder. Reducing priority from {} to next lower {} for {}"
-        print(note.format(priority_current,
-                         slo_priorities[priority_current]["next_priority"]["name"],
-                         poo_id))
+    if (
+        poo_reminder_state["has_repeat_reminder"]
+        and (
+            poo_reminder_state["last_reminder"]
+            + slo_priorities[priority_current]["period"]
+        )
+        < present
+    ):
+        note = (
+            "No response to reminder. Reducing priority from {} to next lower {} for {}"
+        )
+        print(
+            note.format(
+                priority_current,
+                slo_priorities[priority_current]["next_priority"]["name"],
+                poo_id,
+            )
+        )
         url = "{}/{}.json".format(data["web"], poo_id)
-        msg = " ".join([reminder_text_common.format(priority=priority_current, url=data["url"]), update_slo_text.format(
-            priority=slo_priorities[priority_current]["next_priority"]["name"])])
-        json_rest("PUT", url,
-                  {"issue":
-                   {"priority_id": slo_priorities[priority_current]["next_priority"]["id"],
-                    "notes": msg}})
+        msg = " ".join(
+            [
+                reminder_text_common.format(priority=priority_current, url=data["url"]),
+                update_slo_text.format(
+                    priority=slo_priorities[priority_current]["next_priority"]["name"]
+                ),
+            ]
+        )
+        json_rest(
+            "PUT",
+            url,
+            {
+                "issue": {
+                    "priority_id": slo_priorities[priority_current]["next_priority"][
+                        "id"
+                    ],
+                    "notes": msg,
+                }
+            },
+        )
 
 
 def list_issues(conf, root):
     try:
         for poo in root["issues"]:
-            poo_reminder_state = {'last_reminder': datetime.min,
-                                  'has_repeat_reminder': False}
+            poo_reminder_state = {
+                "last_reminder": datetime.min,
+                "has_repeat_reminder": False,
+            }
             if "updated_on" in conf["query"]:
                 issue_reminder(conf, poo, poo_reminder_state)
     except KeyError:
@@ -148,11 +199,12 @@ def reminder_exists(poo, journals, state):
         if journal.get("notes", None) is None or len(journal["notes"]) == 0:
             continue
         if re.search(reminder_regex, journal["notes"]):
-            state['last_reminder'] = datetime.strptime(journal["created_on"],
-                                                       "%Y-%m-%dT%H:%M:%SZ")
-            state['has_repeat_reminder'] = True
+            state["last_reminder"] = datetime.strptime(
+                journal["created_on"], "%Y-%m-%dT%H:%M:%SZ"
+            )
+            state["has_repeat_reminder"] = True
             return True
-    state['has_repeat_reminder'] = False
+    state["has_repeat_reminder"] = False
     return False
 
 
@@ -161,7 +213,147 @@ def failure_more(conf):
     return False
 
 
+def make_github_search_url(repos, stale_days=0):
+    from urllib.parse import quote
+
+    query_parts = ["is:pr", "is:open"]
+    for repo in repos:
+        query_parts.append(f"repo:{repo}")
+    if stale_days > 0:
+        stale_date = (
+            datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=stale_days)
+        ).strftime("%Y-%m-%d")
+        query_parts.append(f"updated:<{stale_date}")
+    return "https://github.com/pulls?q=" + quote(" ".join(query_parts))
+
+
+def fetch_github_prs(repos):
+    from urllib.parse import quote
+
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "backlogger",
+    }
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    q = "is:pr is:open " + " ".join(f"repo:{repo}" for repo in repos)
+    all_items = []
+    page = 1
+    while True:
+        url = f"https://api.github.com/search/issues?q={quote(q)}&per_page=100&page={page}"
+        r = retry_request("GET", url, data=None, headers=headers)
+        r.raise_for_status()
+        res_json = r.json()
+        items = res_json.get("items", [])
+        all_items.extend(items)
+        if len(items) < 100 or len(all_items) >= res_json.get("total_count", 0):
+            break
+        page += 1
+    return all_items
+
+
+def check_github_backlog(conf):
+    repos = conf["repos"]
+    stale_days = conf.get("stale_days", 0)
+
+    try:
+        items = fetch_github_prs(repos)
+    except Exception as e:
+        sys.stderr.write(f"Error fetching GitHub PRs for {conf['title']}: {e}\n")
+        return (False, 0, f"\n**Error fetching GitHub PRs for {conf['title']}**: {e}\n")
+
+    repo_prs = {repo: [] for repo in repos}
+    for item in items:
+        parts = item["html_url"].split("/")
+        if len(parts) >= 5:
+            repo_name = f"{parts[3]}/{parts[4]}"
+            if repo_name in repo_prs:
+                repo_prs[repo_name].append(item)
+
+    stale_prs_count = 0
+    stale_by_repo = {repo: 0 for repo in repos}
+    oldest_by_repo = {repo: None for repo in repos}
+    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    for repo, prs in repo_prs.items():
+        for pr in prs:
+            updated_at = datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ")
+            created_at = datetime.strptime(pr["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+
+            if stale_days > 0:
+                if (now_naive - updated_at).days >= stale_days:
+                    stale_prs_count += 1
+                    stale_by_repo[repo] += 1
+            else:
+                stale_by_repo[repo] += 1
+
+            if oldest_by_repo[repo] is None or created_at < oldest_by_repo[repo]:
+                oldest_by_repo[repo] = created_at
+
+    issue_count = stale_prs_count if stale_days > 0 else len(items)
+
+    good = True
+    if "max" in conf:
+        good = not (
+            issue_count > conf["max"] or "min" in conf and issue_count < conf["min"]
+        )
+
+    def sort_key(repo):
+        open_count = len(repo_prs[repo])
+        st_count = stale_by_repo[repo]
+        if stale_days > 0:
+            return (-st_count, -open_count, repo)
+        else:
+            return (-open_count, repo)
+
+    sorted_repos = sorted(repos, key=sort_key)
+
+    details_lines = []
+    details_lines.append(f"\n<details>")
+    details_lines.append(
+        f"<summary><b>Show breakdown for: {conf['title']}</b></summary>\n"
+    )
+
+    if stale_days > 0:
+        details_lines.append(
+            f"| Repository | Open PRs | Stale PRs (>{stale_days}d) | Oldest PR |"
+        )
+        details_lines.append("| --- | --- | --- | --- |")
+        for repo in sorted_repos:
+            open_count = len(repo_prs[repo])
+            st_count = stale_by_repo[repo]
+            oldest_dt = oldest_by_repo[repo]
+            oldest_str = (
+                f"{(now_naive - oldest_dt).days} days ago" if oldest_dt else "-"
+            )
+            st_str = f"**{st_count}** 🔴" if st_count > 0 else "0"
+            repo_link = f"[{repo}](https://github.com/{repo}/pulls)"
+            details_lines.append(
+                f"| {repo_link} | {open_count} | {st_str} | {oldest_str} |"
+            )
+    else:
+        details_lines.append("| Repository | Open PRs | Oldest PR |")
+        details_lines.append("| --- | --- | --- |")
+        for repo in sorted_repos:
+            open_count = len(repo_prs[repo])
+            oldest_dt = oldest_by_repo[repo]
+            oldest_str = (
+                f"{(now_naive - oldest_dt).days} days ago" if oldest_dt else "-"
+            )
+            repo_link = f"[{repo}](https://github.com/{repo}/pulls)"
+            details_lines.append(f"| {repo_link} | {open_count} | {oldest_str} |")
+
+    details_lines.append("\n</details>")
+    details_md = "\n".join(details_lines)
+
+    return (good, issue_count, details_md)
+
+
 def check_backlog(conf):
+    if conf.get("type") == "github":
+        return check_github_backlog(conf)
     root = json_rest("GET", data["api"] + "?" + conf["query"])
     issue_count = list_issues(conf, root)
     good = True
@@ -169,16 +361,20 @@ def check_backlog(conf):
         good = not (
             issue_count > conf["max"] or "min" in conf and issue_count < conf["min"]
         )
-    return (good, issue_count)
+    return (good, issue_count, None)
 
 
 def render_table(data):
     all_good = True
     rows = []
     bad_queries = {}
+    details_md_blocks = []
     for conf in data["queries"]:
-        good, issue_count = check_backlog(conf)
-        url = data["web"] + "?" + conf["query"]
+        good, issue_count, details_md = check_backlog(conf)
+        if conf.get("type") == "github":
+            url = make_github_search_url(conf["repos"], conf.get("stale_days", 0))
+        else:
+            url = data["web"] + "?" + conf["query"]
         limits = "<" + str(conf["max"] + 1) if "max" in conf else ""
         if "min" in conf:
             limits += ", >" + str(conf["min"] - 1)
@@ -190,21 +386,29 @@ def render_table(data):
                 result_icons["pass"] if good else result_icons["fail"],
             ]
         )
+        if details_md:
+            details_md_blocks.append(details_md)
         if not good:
             all_good = False
-            bad_queries[conf['title']] = {"url": url, "issue_count": issue_count, "limits": limits}
-    return (all_good, rows, bad_queries)
+            bad_queries[conf["title"]] = {
+                "url": url,
+                "issue_count": issue_count,
+                "limits": limits,
+            }
+    return (all_good, rows, bad_queries, details_md_blocks)
 
 
 def remove_project_part_from_url(url):
-    return(re.sub("projects/.*/", "", url))
+    return re.sub("projects/.*/", "", url)
 
 
 def cycle_time(issue, status_ids):
     start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
     cycle_time = 0
     in_cycle_status = [str(status_ids["In Progress"]), str(status_ids["Feedback"])]
-    url = "{}/{}.json?include=journals".format(remove_project_part_from_url(data["web"]), issue["id"])
+    url = "{}/{}.json?include=journals".format(
+        remove_project_part_from_url(data["web"]), issue["id"]
+    )
     issue = json_rest("GET", url)["issue"]
     for journal in issue["journals"]:
         for detail in journal["details"]:
@@ -228,12 +432,17 @@ def _today_nanoseconds():
 def render_influxdb(data):
     output = []
 
-    statuses = json_rest("GET", remove_project_part_from_url(data["api"]).replace("issues", "issue_statuses"))
+    statuses = json_rest(
+        "GET",
+        remove_project_part_from_url(data["api"]).replace("issues", "issue_statuses"),
+    )
     status_ids = {}
     for status in statuses["issue_statuses"]:
         status_ids[status["name"]] = status["id"]
 
     for conf in data["queries"]:
+        if conf.get("type") == "github":
+            continue
         root = json_rest("GET", data["api"] + "?" + conf["query"] + "&limit=100")
         issue_count = list_issues(conf, root)
         status_names = []
@@ -255,10 +464,18 @@ def render_influxdb(data):
             if status == "Resolved":
                 measure = "leadTime"
                 extra = ",leadTime={leadTime},cycleTime={cycleTime},leadTimeSum={leadTimeSum},cycleTimeSum={cycleTimeSum}".format(
-                    leadTime=escape_telegraf_str(mean(times["leadTime"]) / 3600, "field value"),
-                    cycleTime=escape_telegraf_str(mean(times["cycleTime"]) / 3600, "field value"),
-                    leadTimeSum=escape_telegraf_str(sum(times["leadTime"]) / 3600, "field value"),
-                    cycleTimeSum=escape_telegraf_str(sum(times["cycleTime"]) / 3600, "field value"),
+                    leadTime=escape_telegraf_str(
+                        mean(times["leadTime"]) / 3600, "field value"
+                    ),
+                    cycleTime=escape_telegraf_str(
+                        mean(times["cycleTime"]) / 3600, "field value"
+                    ),
+                    leadTimeSum=escape_telegraf_str(
+                        sum(times["leadTime"]) / 3600, "field value"
+                    ),
+                    cycleTimeSum=escape_telegraf_str(
+                        sum(times["cycleTime"]) / 3600, "field value"
+                    ),
                 )
             else:
                 measure = "slo"
@@ -277,36 +494,41 @@ def render_influxdb(data):
                 output[-1] += " " + str(_today_nanoseconds())
     return output
 
+
 def escape_telegraf_str(value_to_escape, element):
     # See https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/#special-characters for escaping rules and where they apply
-    escaped_str = str(value_to_escape) #especially for field values it can happen that we get an int
-    if (element == "field value"): #field values are the only thing where unique rules apply
+    escaped_str = str(
+        value_to_escape
+    )  # especially for field values it can happen that we get an int
+    if (
+        element == "field value"
+    ):  # field values are the only thing where unique rules apply
         escaped_str = escaped_str.replace("\\", "\\\\")
-        escaped_str = escaped_str.replace("\"", "\\\"")
+        escaped_str = escaped_str.replace('"', '\\"')
         return escaped_str
 
     # common rules applicable to everything else
     escaped_str = escaped_str.replace(",", "\\,")
     escaped_str = escaped_str.replace(" ", "\\ ")
-    if (element != "measurement"):
+    if element != "measurement":
         escaped_str = escaped_str.replace("=", "\\=")
     return escaped_str
 
+
 def get_state():
-    if os.environ.get('STATE_FOLDER'):
-        old_state_file = os.path.join(os.environ['STATE_FOLDER'], "state.json")
+    if os.environ.get("STATE_FOLDER"):
+        old_state_file = os.path.join(os.environ["STATE_FOLDER"], "state.json")
         if os.path.exists(old_state_file):
             # open state.json from last run, see if anything changed and send slack notification if needed
             with open(old_state_file, "r") as sj:
                 return json.load(sj)
 
+
 def update_state(bad_queries):
     with open("state.json", "w") as sj:
-        state = {
-            "bad_queries": bad_queries,
-            "updated": datetime.now().isoformat()
-        }
+        state = {"bad_queries": bad_queries, "updated": datetime.now().isoformat()}
         json.dump(state, sj)
+
 
 def trigger_webhook(state, bad_queries):
     if state:
@@ -324,8 +546,9 @@ def trigger_webhook(state, bad_queries):
         elif fixed_queries and not new_bad_queries:
             # this is the first green run so let's let everyone know
             msg = f":green_heart: All queries within limits again!"
-        if msg and os.environ.get('WEBHOOK_URL'):
-            r = requests.post(os.environ['WEBHOOK_URL'], json={"msg": msg})
+        if msg and os.environ.get("WEBHOOK_URL"):
+            r = requests.post(os.environ["WEBHOOK_URL"], json={"msg": msg})
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -345,10 +568,12 @@ if __name__ == "__main__":
                 print("\n".join(line for line in render_influxdb(data)))
             else:
                 initialize_md(data)
-                all_good, rows, bad_queries = render_table(data)
+                all_good, rows, bad_queries, details_md_blocks = render_table(data)
                 with open("index.md", "a") as md:
                     for row in rows:
                         md.write("|".join(row) + "\n")
+                    if details_md_blocks:
+                        md.write("\n" + "\n".join(details_md_blocks) + "\n")
                 # open state.json from last run, see if anything changed and send webhook notification if needed
                 state = get_state()
                 trigger_webhook(state, bad_queries)

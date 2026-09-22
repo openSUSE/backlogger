@@ -1,7 +1,8 @@
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, patch
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -21,10 +22,12 @@ class TestOutput(unittest.TestCase):
     def test_influxdb(self):
         backlogger.json_rest = MagicMock(
             side_effect=[
-                {"issue_statuses": [
-                    {"name": "In Progress", "id": 2},
-                    {"name": "Feedback", "id": 4}
-                ]},
+                {
+                    "issue_statuses": [
+                        {"name": "In Progress", "id": 2},
+                        {"name": "Feedback", "id": 4},
+                    ]
+                },
                 {
                     "issues": [
                         {
@@ -142,3 +145,80 @@ class TestOutput(unittest.TestCase):
                     ],
                 ],
             )
+
+    @patch("backlogger.fetch_github_prs")
+    def test_github_backlog(self, mock_fetch):
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        stale_date = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        fresh_date = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        mock_fetch.return_value = [
+            {
+                "html_url": "https://github.com/os-autoinst/openQA/pull/1",
+                "updated_at": stale_date,
+                "created_at": stale_date,
+            },
+            {
+                "html_url": "https://github.com/os-autoinst/openQA/pull/2",
+                "updated_at": fresh_date,
+                "created_at": fresh_date,
+            },
+            {
+                "html_url": "https://github.com/os-autoinst/os-autoinst/pull/3",
+                "updated_at": stale_date,
+                "created_at": stale_date,
+            },
+        ]
+
+        conf = {
+            "title": "Stale PRs",
+            "type": "github",
+            "repos": ["os-autoinst/openQA", "os-autoinst/os-autoinst"],
+            "stale_days": 7,
+            "max": 1,
+        }
+
+        good, issue_count, details_md = backlogger.check_github_backlog(conf)
+        self.assertFalse(good)  # 2 stale PRs > max 1
+        self.assertEqual(issue_count, 2)
+        self.assertIn("Show breakdown for: Stale PRs", details_md)
+        self.assertIn("os-autoinst/openQA", details_md)
+        self.assertIn("os-autoinst/os-autoinst", details_md)
+        self.assertIn("10 days ago", details_md)
+        self.assertIn("**1** 🔴", details_md)  # Each repo has 1 stale PR
+
+    @patch("backlogger.fetch_github_prs")
+    def test_github_render_table(self, mock_fetch):
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        stale_date = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        mock_fetch.return_value = [
+            {
+                "html_url": "https://github.com/os-autoinst/openQA/pull/1",
+                "updated_at": stale_date,
+                "created_at": stale_date,
+            }
+        ]
+
+        data = {
+            "api": "https://example.com/issues.json",
+            "web": "https://example.com/issues",
+            "team": "Awesome Team",
+            "queries": [
+                {
+                    "title": "Stale PRs",
+                    "type": "github",
+                    "repos": ["os-autoinst/openQA"],
+                    "stale_days": 7,
+                    "max": 0,
+                }
+            ],
+        }
+        backlogger.data = data
+        all_good, rows, bad_queries, details_md_blocks = backlogger.render_table(data)
+
+        self.assertFalse(all_good)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][1], "1")  # 1 stale PR
+        self.assertEqual(rows[0][3], "&#x1F534;")  # red/fail icon
+        self.assertEqual(len(details_md_blocks), 1)
+        self.assertIn("Show breakdown for: Stale PRs", details_md_blocks[0])
