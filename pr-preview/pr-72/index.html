@@ -1,0 +1,47 @@
+<html prefix="og: https://ogp.me/ns#">
+<head>
+<title>Backlog Status</title>
+<meta charset="UTF-8">
+<!-- Facebook / Slack tags -->
+<meta property="og:title" content="Backlog Limits Checker Build" />
+<meta property="og:url" content="https://github.com/openSUSE/backlogger" />
+<meta http-equiv="refresh" content="600">
+<style>
+main {
+    font-family: Verdana, Arial;
+    border-top: 5px solid #55cc33;
+    margin: 0px 5px 5px 5px;
+    padding: 0 5px;
+    background-color: white;
+}
+table {
+    border: 1px solid #a8a8a8;
+    border-collapse: collapse;
+    box-shadow: 2px 2px 4px 1px grey;
+}
+table tr th, table tr td {
+    border: 1px solid #a8a8a8;
+    background-color: white;
+    padding: 3px;
+}
+a {
+    text-decoration: none;
+    font-weight: bold;
+}
+</style>
+</head>
+<body>
+<main>
+<h1>Backlog Status</h1>
+<p>This is the dashboard for <a href="http://example.com">Example</a>.
+<strong>Latest Run:</strong> 2026-09-23 16:13:29 UTC
+<em>(Please refresh to see latest results)</em></p>
+<p>Backlog Query | Number of Issues | Limits | Status
+--- | --- | --- | ---
+<a href="https://progress.opensuse.org/issues?query_id=478">Workable Backlog</a>|27|&lt;40, &gt;10|&#x1F49A;
+<a href="https://progress.opensuse.org/issues?query_id=576&amp;project_id=115">Untriaged QA</a>|0|&lt;1|&#x1F49A;
+<a href="https://progress.opensuse.org/issues?query_id=544">SLO high (&lt;1 month)</a>|0|&lt;1|&#x1F49A;
+<a href="https://progress.opensuse.org/issues?query_id=520">In Feedback</a>|8|&lt;31, &gt;0|&#x1F49A;
+<a href="https://progress.opensuse.org/issues?query_id=773">Closed yesterday</a>|3||&#x1F49A;</p><hr>
+<a href="https://github.com/openSUSE/backlogger">openSUSE/backlogger on GitHub</a>
+</main></body></html>
