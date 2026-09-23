@@ -32,4 +32,6 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'Dockerfile'
+  image: 'container/Dockerfile'
+  args:
+    - "/github/workspace/entrypoint.sh"

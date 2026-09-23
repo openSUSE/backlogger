@@ -32,7 +32,7 @@ fi
 # Render Markdown from configured backlog queries
 echo "Running backlogger.py..."
 set +e
-python3 /app/backlogger.py "${CONFIG}" ${ARGS}
+python3 backlogger.py "${CONFIG}" ${ARGS}
 backlog_status=$?
 set -e
 
@@ -64,13 +64,13 @@ fi
 # Render HTML
 echo "Rendering HTML..."
 mkdir -p "${FOLDER}"
-cat /app/head.html >"${FOLDER}/index.html"
+cat head.html >"${FOLDER}/index.html"
 if [ -f index.md ]; then
 	python3 -m markdown index.md >>"${FOLDER}/index.html"
 else
 	echo "index.md not found!"
 fi
-cat /app/foot.html >>"${FOLDER}/index.html"
+cat foot.html >>"${FOLDER}/index.html"
 
 sed -i \
 	-e "s@STATUS_COLOR@${status_color}@g" \
