@@ -272,8 +272,8 @@ def check_github_backlog(conf):
                 repo_prs[repo_name].append(item)
 
     stale_prs_count = 0
-    stale_by_repo = {repo: 0 for repo in repos}
-    oldest_by_repo = {repo: None for repo in repos}
+    stale_by_repo = dict.fromkeys(repos, 0)
+    oldest_by_repo = dict.fromkeys(repos)
     now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
 
     for repo, prs in repo_prs.items():
@@ -443,7 +443,7 @@ def render_influxdb(data):
         if conf.get("type") == "github":
             continue
         root = json_rest("GET", data["api"] + "?" + conf["query"] + "&limit=100")
-        issue_count = list_issues(conf, root)
+        list_issues(conf, root)
         status_names = []
         result = {}
         for issue in root["issues"]:
@@ -546,7 +546,7 @@ def trigger_webhook(state, bad_queries):
             # this is the first green run so let's let everyone know
             msg = ":green_heart: All queries within limits again!"
         if msg and os.environ.get("WEBHOOK_URL"):
-            r = requests.post(os.environ["WEBHOOK_URL"], json={"msg": msg})
+            requests.post(os.environ["WEBHOOK_URL"], json={"msg": msg})
 
 
 if __name__ == "__main__":
