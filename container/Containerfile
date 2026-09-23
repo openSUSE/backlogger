@@ -1,0 +1,5 @@
+FROM opensuse/tumbleweed
+RUN zypper -n in -y python3 python3-pip git-core ImageMagick ghostscript libpango-1_0-0 libcairo2 libgdk_pixbuf-2_0-0 && zypper clean -a
+RUN sed -i '/pattern="PDF"/d' /etc/IM-*/policy.xml /etc/ImageMagick-*/policy.xml 2>/dev/null || true
+# Install pip dependencies explicitly to allow isolated builds
+RUN pip install --break-system-packages argparse requests statistics urllib3 pyyaml pytest Markdown weasyprint
