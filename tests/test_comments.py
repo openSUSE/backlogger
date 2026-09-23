@@ -1,10 +1,11 @@
 import os
+import re
 import sys
 import unittest
-import pytest
-import re
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, call
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -136,7 +137,7 @@ class TestComments(unittest.TestCase):
                     {
                         "issue": {
                             "priority_id": prio_id_to,
-                            "notes": "This ticket was set to **{}** priority but was not updated [within the SLO period](https://example.com/issues). The ticket will be set to the next lower priority **{}**.".format(prio_from, prio_to)
+                            "notes": f"This ticket was set to **{prio_from}** priority but was not updated [within the SLO period](https://example.com/issues). The ticket will be set to the next lower priority **{prio_to}**."
                         }
                     },
                 ),

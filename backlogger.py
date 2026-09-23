@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
 import argparse
-import os
-import sys
-import json
-from statistics import mean
-from datetime import datetime, timedelta, timezone
-from inspect import getmembers, isfunction
 import calendar
+import json
+import os
+import re
+import sys
+from datetime import datetime, timedelta, timezone
+from statistics import mean
+from urllib.parse import urlparse
+
 import requests
+import yaml
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from urllib.parse import urlparse
-import yaml
-import re
-
 
 # Icons used for PASS or FAIL in the md file
 result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
@@ -69,7 +68,7 @@ def retry_request(method, url, data, headers, attempts=7):
     )
     http = requests.Session()
     parsed_url = urlparse(url)
-    http.mount("{}://".format(parsed_url.scheme), HTTPAdapter(max_retries=retries))
+    http.mount(f"{parsed_url.scheme}://", HTTPAdapter(max_retries=retries))
     return http.request(method, url, data=data, headers=headers)
 
 
@@ -122,7 +121,7 @@ def issue_reminder(conf, poo, poo_reminder_state):
 
 
 def _send_first_reminder(poo_id, msg):
-    print("Writing reminder for {}".format(poo_id))
+    print(f"Writing reminder for {poo_id}")
     url = "{}/{}.json".format(data["web"], poo_id)
     json_rest("PUT", url, {"issue": {"notes": msg}})
 
@@ -311,7 +310,7 @@ def check_github_backlog(conf):
     sorted_repos = sorted(repos, key=sort_key)
 
     details_lines = []
-    details_lines.append(f"\n<details>")
+    details_lines.append("\n<details>")
     details_lines.append(
         f"<summary><b>Show breakdown for: {conf['title']}</b></summary>\n"
     )
@@ -539,13 +538,13 @@ def trigger_webhook(state, bad_queries):
         msg = None
         if broken_queries:
             # something new broke
-            msg = f":red_circle: Some queries are exceeding limits:"
+            msg = ":red_circle: Some queries are exceeding limits:"
             for query in new_bad_queries:
                 qd = bad_queries[query]
                 msg += f"\n• {query} (Issue count {qd['issue_count']} exceeding limit of [{qd['limits']}])"
         elif fixed_queries and not new_bad_queries:
             # this is the first green run so let's let everyone know
-            msg = f":green_heart: All queries within limits again!"
+            msg = ":green_heart: All queries within limits again!"
         if msg and os.environ.get("WEBHOOK_URL"):
             r = requests.post(os.environ["WEBHOOK_URL"], json={"msg": msg})
 
@@ -570,8 +569,7 @@ if __name__ == "__main__":
                 initialize_md(data)
                 all_good, rows, bad_queries, details_md_blocks = render_table(data)
                 with open("index.md", "a") as md:
-                    for row in rows:
-                        md.write("|".join(row) + "\n")
+                    md.writelines("|".join(row) + "\n" for row in rows)
                     if details_md_blocks:
                         md.write("\n" + "\n".join(details_md_blocks) + "\n")
                 # open state.json from last run, see if anything changed and send webhook notification if needed
@@ -579,6 +577,6 @@ if __name__ == "__main__":
                 trigger_webhook(state, bad_queries)
                 update_state(bad_queries)
     except FileNotFoundError:
-        sys.exit("Configuration file {} not found".format(switches.config))
+        sys.exit(f"Configuration file {switches.config} not found")
     if switches.exit_code and not all_good:
         sys.exit(3)
