@@ -23,7 +23,7 @@ reminder_regex = (
     r"^This ticket was set to .* priority but was not updated.* Please consider"
 )
 
-present = datetime.now()
+present = datetime.now(timezone.utc).replace(tzinfo=None)
 slo_priorities = {
     "Immediate": {
         "period": timedelta(days=1),
@@ -54,7 +54,9 @@ def initialize_md(data):
             "This is the dashboard for [{}]({}).\n".format(data["team"], data["url"])
         )
         md.write(
-            "**Latest Run:** " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + " UTC\n"
+            "**Latest Run:** "
+            + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            + " UTC\n"
         )
         md.write("*(Please refresh to see latest results)*\n\n")
         md.write(
@@ -77,7 +79,7 @@ def json_rest(method, url, rest=None):
     try:
         key = os.environ["REDMINE_API_KEY"]
     except KeyError:
-        exit("REDMINE_API_KEY is required to be set")
+        sys.exit("REDMINE_API_KEY is required to be set")
     headers = {
         "User-Agent": "backlogger ({})".format(data["url"]),
         "Content-Type": "application/json",
@@ -172,7 +174,9 @@ def list_issues(conf, root):
     try:
         for poo in root["issues"]:
             poo_reminder_state = {
-                "last_reminder": datetime.min,
+                "last_reminder": datetime.min.replace(tzinfo=timezone.utc).replace(
+                    tzinfo=None
+                ),
                 "has_repeat_reminder": False,
             }
             if "updated_on" in conf["query"]:
@@ -198,9 +202,9 @@ def reminder_exists(poo, journals, state):
         if journal.get("notes", None) is None or len(journal["notes"]) == 0:
             continue
         if re.search(reminder_regex, journal["notes"]):
-            state["last_reminder"] = datetime.strptime(
-                journal["created_on"], "%Y-%m-%dT%H:%M:%SZ"
-            )
+            state["last_reminder"] = datetime.fromisoformat(
+                journal["created_on"]
+            ).replace(tzinfo=None)
             state["has_repeat_reminder"] = True
             return True
     state["has_repeat_reminder"] = False
@@ -259,7 +263,7 @@ def check_github_backlog(conf):
 
     try:
         items = fetch_github_prs(repos)
-    except Exception as e:
+    except (requests.RequestException, ValueError) as e:
         sys.stderr.write(f"Error fetching GitHub PRs for {conf['title']}: {e}\n")
         return (False, 0, f"\n**Error fetching GitHub PRs for {conf['title']}**: {e}\n")
 
@@ -278,8 +282,8 @@ def check_github_backlog(conf):
 
     for repo, prs in repo_prs.items():
         for pr in prs:
-            updated_at = datetime.strptime(pr["updated_at"], "%Y-%m-%dT%H:%M:%SZ")
-            created_at = datetime.strptime(pr["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+            updated_at = datetime.fromisoformat(pr["updated_at"]).replace(tzinfo=None)
+            created_at = datetime.fromisoformat(pr["created_at"]).replace(tzinfo=None)
 
             if stale_days > 0:
                 if (now_naive - updated_at).days >= stale_days:
@@ -402,7 +406,7 @@ def remove_project_part_from_url(url):
 
 
 def cycle_time(issue, status_ids):
-    start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+    start = datetime.fromisoformat(issue["created_on"]).replace(tzinfo=None)
     cycle_time = 0
     in_cycle_status = [str(status_ids["In Progress"]), str(status_ids["Feedback"])]
     url = "{}/{}.json?include=journals".format(
@@ -413,18 +417,20 @@ def cycle_time(issue, status_ids):
         for detail in journal["details"]:
             if detail["name"] == "status_id":
                 if detail["new_value"] in in_cycle_status:
-                    start = datetime.strptime(
-                        journal["created_on"], "%Y-%m-%dT%H:%M:%SZ"
+                    start = datetime.fromisoformat(journal["created_on"]).replace(
+                        tzinfo=None
                     )
                 elif detail["old_value"] in in_cycle_status:
-                    end = datetime.strptime(journal["created_on"], "%Y-%m-%dT%H:%M:%SZ")
+                    end = datetime.fromisoformat(journal["created_on"]).replace(
+                        tzinfo=None
+                    )
                     cycle_time += (end - start).total_seconds()
     return cycle_time
 
 
 def _today_nanoseconds():
-    dt = datetime.today().replace(hour=0, minute=0, second=0, microsecond=0)
-    epoch = datetime.utcfromtimestamp(0)
+    dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    epoch = datetime.fromtimestamp(0, timezone.utc)
     return int((dt - epoch).total_seconds() * 1000000000)
 
 
@@ -452,8 +458,8 @@ def render_influxdb(data):
                 status_names.append(status)
                 result[status] = {"leadTime": [], "cycleTime": []}
 
-            start = datetime.strptime(issue["created_on"], "%Y-%m-%dT%H:%M:%SZ")
-            end = datetime.strptime(issue["updated_on"], "%Y-%m-%dT%H:%M:%SZ")
+            start = datetime.fromisoformat(issue["created_on"]).replace(tzinfo=None)
+            end = datetime.fromisoformat(issue["updated_on"]).replace(tzinfo=None)
             result[status]["leadTime"].append((end - start).total_seconds())
             if status == "Resolved":
                 result[status]["cycleTime"].append(cycle_time(issue, status_ids))
@@ -525,7 +531,10 @@ def get_state():
 
 def update_state(bad_queries):
     with open("state.json", "w") as sj:
-        state = {"bad_queries": bad_queries, "updated": datetime.now().isoformat()}
+        state = {
+            "bad_queries": bad_queries,
+            "updated": datetime.now(timezone.utc).isoformat(),
+        }
         json.dump(state, sj)
 
 

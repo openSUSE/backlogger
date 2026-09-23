@@ -214,7 +214,7 @@ class TestOutput(unittest.TestCase):
             ],
         }
         backlogger.data = data
-        all_good, rows, bad_queries, details_md_blocks = backlogger.render_table(data)
+        all_good, rows, _, details_md_blocks = backlogger.render_table(data)
 
         self.assertFalse(all_good)
         self.assertEqual(len(rows), 1)

@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -78,7 +78,9 @@ class TestComments(unittest.TestCase):
                     {
                         "id": 3,
                         "notes": "This ticket was set to **High** priority but was not updated [within the SLO period](https://example.com/issues). Please consider picking up this ticket or just set the ticket to the next lower priority.",
-                        "created_on": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "created_on": datetime.now(timezone.utc).strftime(
+                            "%Y-%m-%dT%H:%M:%SZ"
+                        ),
                     },
                 ],
             },
@@ -88,13 +90,18 @@ class TestComments(unittest.TestCase):
         backlogger.issue_reminder(
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"priority": {"name": "High"}, "id": 1000},
-            {"has_repeat_reminder": datetime.min, "last_reminder": False},
+            {
+                "has_repeat_reminder": datetime.min.replace(
+                    tzinfo=timezone.utc
+                ).replace(tzinfo=None),
+                "last_reminder": False,
+            },
         )
         backlogger.json_rest.assert_called_once_with(
             "GET",
             "https://example.com/wiki/1000.json?include=journals",
         )
-        out, err = self.capsys.readouterr()
+        out, _ = self.capsys.readouterr()
         assert re.match("Skipping reminder for 1000", out)
 
     def test_empty_issue(self):
@@ -102,13 +109,18 @@ class TestComments(unittest.TestCase):
         backlogger.issue_reminder(
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"priority": {"name": "High"}, "id": 1000},
-            {"has_repeat_reminder": datetime.min, "last_reminder": False},
+            {
+                "has_repeat_reminder": datetime.min.replace(
+                    tzinfo=timezone.utc
+                ).replace(tzinfo=None),
+                "last_reminder": False,
+            },
         )
         backlogger.json_rest.assert_called_once_with(
             "GET",
             "https://example.com/wiki/1000.json?include=journals",
         )
-        out, err = self.capsys.readouterr()
+        _, err = self.capsys.readouterr()
         assert re.match("API for 1000 returned None", err)
 
     def test_automatic_priority_on_issue(self):
@@ -126,7 +138,7 @@ class TestComments(unittest.TestCase):
             prio_id_to = params[3]
             with self.subTest(params):
                 self._test_issue_reminder(prio_from=params[0], past_days=params[2])
-                out, err = self.capsys.readouterr()
+                out, _ = self.capsys.readouterr()
                 assert re.search(expected_str.format(prio_from, prio_to), out)
             calls = [
                 call(
@@ -155,7 +167,7 @@ class TestComments(unittest.TestCase):
         for params in test_params:
             with self.subTest(params):
                 self._test_issue_reminder(prio_from=params[0], past_days=params[1])
-                out, err = self.capsys.readouterr()
+                out, _ = self.capsys.readouterr()
                 assert re.search("Skipping priority update for 1000", out)
             calls = [
                 call(
@@ -183,7 +195,7 @@ class TestComments(unittest.TestCase):
                         "id": 3,
                         "notes": "This ticket was set to **Urgent** priority but was not updated [within the SLO period](https://example.com/issues). Please consider picking up this ticket or just set the ticket to the next lower priority.",
                         "created_on": (
-                            datetime.now() - timedelta(days=past_days)
+                            datetime.now(timezone.utc) - timedelta(days=past_days)
                         ).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
@@ -194,5 +206,10 @@ class TestComments(unittest.TestCase):
         backlogger.issue_reminder(
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"priority": {"name": prio_from}, "id": 1000},
-            {"has_repeat_reminder": datetime.min, "last_reminder": False},
+            {
+                "has_repeat_reminder": datetime.min.replace(
+                    tzinfo=timezone.utc
+                ).replace(tzinfo=None),
+                "last_reminder": False,
+            },
         )
