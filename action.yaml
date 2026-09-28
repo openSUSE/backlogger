@@ -46,7 +46,7 @@ runs:
         python -m pip install --upgrade pip
         pip install -r backlogger/requirements.txt
       shell: bash
-    - run: sudo apt-get update && sudo apt-get install -y kramdown weasyprint imagemagick ghostscript
+    - run: sudo apt-get update && sudo apt-get install -y imagemagick ghostscript libpango-1.0-0 libpangoft2-1.0-0 libcairo2 libgdk-pixbuf2.0-0
       shell: bash
     - name: Get previous published state
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -91,7 +91,7 @@ runs:
           mkdir -p ${{ inputs.folder }}
           cd ${{ inputs.folder }}
           cat ../backlogger/head.html > index.html
-          kramdown ../index.md >> index.html
+          python -m markdown -x tables ../index.md >> index.html
           cat ../backlogger/foot.html >> index.html
           sed -i \
             -e "s@STATUS_COLOR@${{ env.STATUS_COLOR }}@g" \
