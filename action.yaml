@@ -34,4 +34,4 @@ runs:
   using: 'docker'
   image: 'container/Dockerfile'
   args:
-    - "/github/workspace/entrypoint.sh"
+    - "/github/workspace/entrypoint.py"
