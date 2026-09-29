@@ -66,7 +66,7 @@ jobs:
             [PR Preview Action](https://github.com/rossjrw/pr-preview-action) ${{ steps.preview-step.outputs.action-version }}
             :---:
             | <p><img src="https://qr.rossjrw.com/?url=${{ steps.preview-step.outputs.preview-url }}" height="100" align="right" alt="QR code for preview link"></p> :rocket: View preview at <br> ${{ steps.preview-step.outputs.preview-url }} <br><br>
-            | <h6>Built to branch [`gh-pages`](https://github.com/okurz/backlogger/tree/gh-pages) at ${{ steps.preview-step.outputs.action-start-time }}. <br> Preview will be ready when the [GitHub Pages deployment](https://github.com/okurz/backlogger/deployments) is complete. <br><br> </h6>
+            | <h6>Built to branch [`gh-pages`](https://github.com/okurz/backlogger/tree/gh-pages) at ${{ steps.preview-step.outputs.action-start-time }}. <br> Preview will be ready when the [GitHub Pages deployment](https://github.com/okurz/backlogger/deployments) is complete. <br><br> [![Pages Deployment Status](https://github.com/okurz/backlogger/actions/workflows/pages-build-deployment/badge.svg)](https://github.com/okurz/backlogger/deployments) <br></h6>
           # yamllint enable rule:line-length
 
       - name: Comment on PR (remove)
