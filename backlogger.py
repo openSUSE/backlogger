@@ -523,10 +523,12 @@ def escape_telegraf_str(value_to_escape, element):
 def get_state():
     if os.environ.get("STATE_FOLDER"):
         old_state_file = os.path.join(os.environ["STATE_FOLDER"], "state.json")
-        if os.path.exists(old_state_file):
-            # open state.json from last run, see if anything changed and send slack notification if needed
-            with open(old_state_file, "r") as sj:
-                return json.load(sj)
+        if os.path.exists(old_state_file) and os.path.getsize(old_state_file) > 0:
+            try:
+                with open(old_state_file, "r") as sj:
+                    return json.load(sj)
+            except json.JSONDecodeError:
+                return None
 
 
 def update_state(bad_queries):
