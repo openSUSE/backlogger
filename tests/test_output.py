@@ -286,3 +286,88 @@ class TestOutput(unittest.TestCase):
                 self.assertTrue(os.path.isabs(backlogger_cmd.split()[1]))
             finally:
                 os.chdir(orig_cwd)
+
+    def test_get_state(self):
+        cases = [
+            {
+                "desc": "returns None when STATE_FOLDER is not set",
+                "folder": False,
+                "content": None,
+                "expected": None,
+                "stderr": None,
+            },
+            {
+                "desc": "returns None when state file does not exist",
+                "folder": True,
+                "content": None,
+                "expected": None,
+                "stderr": None,
+            },
+            {
+                "desc": "returns None when state file is empty",
+                "folder": True,
+                "content": "",
+                "expected": None,
+                "stderr": None,
+            },
+            {
+                "desc": "returns decoded dict when state file contains valid JSON",
+                "folder": True,
+                "content": '{"bad_queries": {"q1": {}}}',
+                "expected": {"bad_queries": {"q1": {}}},
+                "stderr": None,
+            },
+            {
+                "desc": "warns to stderr and returns None when state file contains malformed JSON",
+                "folder": True,
+                "content": "{invalid_json",
+                "expected": None,
+                "stderr": "Warning: Failed to decode",
+            },
+            {
+                "desc": "warns to stderr and returns None when state file holds a JSON list",
+                "folder": True,
+                "content": "[1]",
+                "expected": None,
+                "stderr": "Warning: Ignoring",
+            },
+            {
+                "desc": "warns to stderr and returns None when state lacks bad_queries",
+                "folder": True,
+                "content": '{"updated": "2026-01-01T00:00:00+00:00"}',
+                "expected": None,
+                "stderr": "Warning: Ignoring",
+            },
+            {
+                "desc": "warns to stderr and returns None when state file is not UTF-8",
+                "folder": True,
+                "content": b"\xff\xfe{}",
+                "expected": None,
+                "stderr": "Warning: Failed to decode",
+            },
+        ]
+        for case in cases:
+            with (
+                self.subTest(case["desc"]),
+                tempfile.TemporaryDirectory() as tmpdir,
+                patch.dict(os.environ),
+                patch("sys.stderr") as mock_stderr,
+            ):
+                if case["folder"]:
+                    os.environ["STATE_FOLDER"] = tmpdir
+                    if case["content"] is not None:
+                        mode = "wb" if isinstance(case["content"], bytes) else "w"
+                        with open(os.path.join(tmpdir, "state.json"), mode) as f:
+                            f.write(case["content"])
+                else:
+                    os.environ.pop("STATE_FOLDER", None)
+                result = backlogger.get_state()
+                self.assertEqual(result, case["expected"])
+                if case["stderr"]:
+                    stderr_output = "".join(
+                        call.args[0] for call in mock_stderr.write.call_args_list
+                    )
+                    self.assertIn(case["stderr"], stderr_output)
+                    self.assertIn("state.json", stderr_output)
+                else:
+                    mock_stderr.write.assert_not_called()
