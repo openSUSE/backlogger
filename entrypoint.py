@@ -111,7 +111,7 @@ def main():
     has_bad_queries = False
     if os.path.isfile("state.json"):
         with (
-            contextlib.suppress(json.JSONDecodeError, OSError),
+            contextlib.suppress(json.JSONDecodeError, UnicodeDecodeError, OSError),
             open("state.json") as f,
         ):
             has_bad_queries = bool(json.load(f))
