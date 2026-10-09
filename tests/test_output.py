@@ -185,7 +185,10 @@ class TestOutput(unittest.TestCase):
         self.assertIn("os-autoinst/openQA", details_md)
         self.assertIn("os-autoinst/os-autoinst", details_md)
         self.assertIn("10 days ago", details_md)
-        self.assertIn("**1** 🔴", details_md)  # Each repo has 1 stale PR
+        self.assertIn("<strong>1</strong> 🔴", details_md)
+        self.assertIn("<table>", details_md)
+        self.assertIn("<td>", details_md)
+        self.assertNotIn("| --- |", details_md)
 
     @patch("backlogger.fetch_github_prs")
     def test_github_render_table(self, mock_fetch):
