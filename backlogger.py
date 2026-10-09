@@ -313,42 +313,40 @@ def check_github_backlog(conf):
 
     sorted_repos = sorted(repos, key=sort_key)
 
-    details_lines = []
-    details_lines.append("\n<details>")
-    details_lines.append(
-        f"<summary><b>Show breakdown for: {conf['title']}</b></summary>\n"
-    )
-
+    headers = ["Repository", "Open PRs"]
     if stale_days > 0:
-        details_lines.append(
-            f"| Repository | Open PRs | Stale PRs (>{stale_days}d) | Oldest PR |"
-        )
-        details_lines.append("| --- | --- | --- | --- |")
-        for repo in sorted_repos:
-            open_count = len(repo_prs[repo])
-            st_count = stale_by_repo[repo]
-            oldest_dt = oldest_by_repo[repo]
-            oldest_str = (
-                f"{(now_naive - oldest_dt).days} days ago" if oldest_dt else "-"
-            )
-            st_str = f"**{st_count}** 🔴" if st_count > 0 else "0"
-            repo_link = f"[{repo}](https://github.com/{repo}/pulls)"
-            details_lines.append(
-                f"| {repo_link} | {open_count} | {st_str} | {oldest_str} |"
-            )
-    else:
-        details_lines.append("| Repository | Open PRs | Oldest PR |")
-        details_lines.append("| --- | --- | --- |")
-        for repo in sorted_repos:
-            open_count = len(repo_prs[repo])
-            oldest_dt = oldest_by_repo[repo]
-            oldest_str = (
-                f"{(now_naive - oldest_dt).days} days ago" if oldest_dt else "-"
-            )
-            repo_link = f"[{repo}](https://github.com/{repo}/pulls)"
-            details_lines.append(f"| {repo_link} | {open_count} | {oldest_str} |")
+        headers.append(f"Stale PRs (>{stale_days}d)")
+    headers.append("Oldest PR")
 
-    details_lines.append("\n</details>")
+    details_lines = [
+        "\n<details>",
+        f"<summary><b>Show breakdown for: {conf['title']}</b></summary>",
+        "<table><thead><tr>"
+        + "".join(f"<th>{h}</th>" for h in headers)
+        + "</tr></thead><tbody>",
+    ]
+    for repo in sorted_repos:
+        open_count = len(repo_prs[repo])
+        oldest_dt = oldest_by_repo[repo]
+        cells = [
+            f'<td><a href="https://github.com/{repo}/pulls">{repo}</a></td>',
+            f"<td>{open_count}</td>",
+        ]
+        if stale_days > 0:
+            st_count = stale_by_repo[repo]
+            cells.append(
+                f"<td><strong>{st_count}</strong> 🔴</td>"
+                if st_count > 0
+                else "<td>0</td>"
+            )
+        cells.append(
+            f"<td>{(now_naive - oldest_dt).days} days ago</td>"
+            if oldest_dt
+            else "<td>-</td>"
+        )
+        details_lines.append("<tr>" + "".join(cells) + "</tr>")
+    details_lines.append("</tbody></table>")
+    details_lines.append("</details>")
     details_md = "\n".join(details_lines)
 
     return (good, issue_count, details_md)
