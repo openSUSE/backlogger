@@ -36,6 +36,6 @@ inputs:
 
 runs:
   using: 'docker'
-  image: 'container/Dockerfile'
+  image: 'registry.opensuse.org/devel/openqa/backlogger/containers/opensuse/backlogger:latest'
   args:
     - "/github/workspace/entrypoint.py"

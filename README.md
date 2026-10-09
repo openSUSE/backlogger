@@ -4,6 +4,16 @@ Produce a document with an overview of your backlog. This can be executed as a s
 
 Have a look at the [demo hosted on GitHub Pages](https://openSUSE.github.io/backlogger)!
 
+## Container
+
+The GitHub Action runs on a pre-built container image published by the Open Build Service instead of rebuilding it on every run:
+
+```
+registry.opensuse.org/devel/openqa/backlogger/containers/opensuse/backlogger:latest
+```
+
+Pull it directly with `podman pull <url>`. The image is built on OBS from `container/Containerfile` (see `container/_service`), so editing that file and bumping the OBS package is enough to refresh it — no local/GitHub container build is needed.
+
 ## Inputs
 
 ## config
