@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from entrypoint import check_render
+
+path = sys.argv[1] if len(sys.argv) > 1 else "index.html"
+try:
+    html = open(path).read()
+except FileNotFoundError:
+    sys.exit(f"check-render: {path} not found")
+
+leaks = check_render(html)
+if not leaks:
+    print(f"check-render: {path} renders without a leaked markdown table")
+    raise SystemExit(0)
+print(f"check-render: FAILED - {path} keeps {len(leaks)} leaked table(s):")
+for first, last, header in leaks:
+    print(f"  lines {first}-{last}: {header}")
+raise SystemExit(2)

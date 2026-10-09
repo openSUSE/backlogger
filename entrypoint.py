@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -11,6 +12,20 @@ import markdown
 
 def run_command(cmd, check=True):
     return subprocess.run(cmd, shell=True, check=check, text=True)
+
+
+def check_render(html_text):
+    pipe = re.compile(r"^\s*\|.*\|\s*$")
+    sep = re.compile(r"^\s*\|?(?:\s*:?-{3,}:?\s*\|)+\s*$")
+    leaks, group = [], []
+    for i, line in enumerate(html_text.splitlines() + [""], 1):
+        if pipe.match(line):
+            group.append((i, line.strip()))
+        elif group:
+            if len(group) >= 2 or any(sep.match(t) for _, t in group):
+                leaks.append((group[0][0], group[-1][0], group[0][1]))
+            group = []
+    return leaks
 
 
 def main():
@@ -82,10 +97,12 @@ def main():
     with open("head.html", "r") as f:
         html_content = f.read()
 
+    body_html = ""
     if os.path.isfile("index.md"):
         with open("index.md", "r") as f:
             md_text = f.read()
-            html_content += markdown.markdown(md_text, extensions=["tables"])
+            body_html = markdown.markdown(md_text, extensions=["tables"])
+        html_content += body_html
     else:
         print("index.md not found!")
 
@@ -102,6 +119,16 @@ def main():
     index_html_path = os.path.join(folder, "index.html")
     with open(index_html_path, "w") as f:
         f.write(html_content)
+
+    leaks = check_render(body_html)
+    if leaks:
+        print(
+            "Render check FAILED: markdown tables leaked as raw text "
+            "(markdown is not parsed inside <details>):"
+        )
+        for first, last, header in leaks:
+            print(f"  body lines {first}-{last}: {header}")
+        sys.exit(2)
 
     print("Rendering PNG preview...")
     run_command(
