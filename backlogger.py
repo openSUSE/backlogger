@@ -5,7 +5,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from statistics import mean
 from urllib.parse import urlparse
 
@@ -23,7 +23,7 @@ reminder_regex = (
     r"^This ticket was set to .* priority but was not updated.* Please consider"
 )
 
-present = datetime.now(timezone.utc).replace(tzinfo=None)
+present = datetime.now(UTC).replace(tzinfo=None)
 slo_priorities = {
     "Immediate": {
         "period": timedelta(days=1),
@@ -55,7 +55,7 @@ def initialize_md(data):
         )
         md.write(
             "**Latest Run:** "
-            + datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+            + datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
             + " UTC\n"
         )
         md.write("*(Please refresh to see latest results)*\n\n")
@@ -174,9 +174,7 @@ def list_issues(conf, root):
     try:
         for poo in root["issues"]:
             poo_reminder_state = {
-                "last_reminder": datetime.min.replace(tzinfo=timezone.utc).replace(
-                    tzinfo=None
-                ),
+                "last_reminder": datetime.min.replace(tzinfo=UTC).replace(tzinfo=None),
                 "has_repeat_reminder": False,
             }
             if "updated_on" in conf["query"]:
@@ -224,7 +222,7 @@ def make_github_search_url(repos, stale_days=0):
         query_parts.append(f"repo:{repo}")
     if stale_days > 0:
         stale_date = (
-            datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=stale_days)
+            datetime.now(UTC).replace(tzinfo=None) - timedelta(days=stale_days)
         ).strftime("%Y-%m-%d")
         query_parts.append(f"updated:<{stale_date}")
     return "https://github.com/pulls?q=" + quote(" ".join(query_parts))
@@ -278,7 +276,7 @@ def check_github_backlog(conf):
     stale_prs_count = 0
     stale_by_repo = dict.fromkeys(repos, 0)
     oldest_by_repo = dict.fromkeys(repos)
-    now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_naive = datetime.now(UTC).replace(tzinfo=None)
 
     for repo, prs in repo_prs.items():
         for pr in prs:
@@ -429,8 +427,8 @@ def cycle_time(issue, status_ids):
 
 
 def _today_nanoseconds():
-    dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    epoch = datetime.fromtimestamp(0, timezone.utc)
+    dt = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    epoch = datetime.fromtimestamp(0, UTC)
     return int((dt - epoch).total_seconds() * 1000000000)
 
 
@@ -533,7 +531,7 @@ def update_state(bad_queries):
     with open("state.json", "w") as sj:
         state = {
             "bad_queries": bad_queries,
-            "updated": datetime.now(timezone.utc).isoformat(),
+            "updated": datetime.now(UTC).isoformat(),
         }
         json.dump(state, sj)
 
