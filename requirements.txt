@@ -4,5 +4,6 @@ statistics
 urllib3
 pyyaml
 pytest
+ruff
 Markdown
 weasyprint
