@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, call
 
 import pytest
@@ -78,9 +78,7 @@ class TestComments(unittest.TestCase):
                     {
                         "id": 3,
                         "notes": "This ticket was set to **High** priority but was not updated [within the SLO period](https://example.com/issues). Please consider picking up this ticket or just set the ticket to the next lower priority.",
-                        "created_on": datetime.now(timezone.utc).strftime(
-                            "%Y-%m-%dT%H:%M:%SZ"
-                        ),
+                        "created_on": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
             },
@@ -91,9 +89,9 @@ class TestComments(unittest.TestCase):
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"priority": {"name": "High"}, "id": 1000},
             {
-                "has_repeat_reminder": datetime.min.replace(
-                    tzinfo=timezone.utc
-                ).replace(tzinfo=None),
+                "has_repeat_reminder": datetime.min.replace(tzinfo=UTC).replace(
+                    tzinfo=None
+                ),
                 "last_reminder": False,
             },
         )
@@ -110,9 +108,9 @@ class TestComments(unittest.TestCase):
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"priority": {"name": "High"}, "id": 1000},
             {
-                "has_repeat_reminder": datetime.min.replace(
-                    tzinfo=timezone.utc
-                ).replace(tzinfo=None),
+                "has_repeat_reminder": datetime.min.replace(tzinfo=UTC).replace(
+                    tzinfo=None
+                ),
                 "last_reminder": False,
             },
         )
@@ -195,7 +193,7 @@ class TestComments(unittest.TestCase):
                         "id": 3,
                         "notes": "This ticket was set to **Urgent** priority but was not updated [within the SLO period](https://example.com/issues). Please consider picking up this ticket or just set the ticket to the next lower priority.",
                         "created_on": (
-                            datetime.now(timezone.utc) - timedelta(days=past_days)
+                            datetime.now(UTC) - timedelta(days=past_days)
                         ).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     },
                 ],
@@ -207,9 +205,9 @@ class TestComments(unittest.TestCase):
             {"query": "query_id=123&c%5B%5D=updated_on"},
             {"priority": {"name": prio_from}, "id": 1000},
             {
-                "has_repeat_reminder": datetime.min.replace(
-                    tzinfo=timezone.utc
-                ).replace(tzinfo=None),
+                "has_repeat_reminder": datetime.min.replace(tzinfo=UTC).replace(
+                    tzinfo=None
+                ),
                 "last_reminder": False,
             },
         )

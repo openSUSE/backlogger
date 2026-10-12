@@ -1,7 +1,7 @@
 import os
 import sys
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -148,7 +148,7 @@ class TestOutput(unittest.TestCase):
 
     @patch("backlogger.fetch_github_prs")
     def test_github_backlog(self, mock_fetch):
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         stale_date = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
         fresh_date = (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -189,7 +189,7 @@ class TestOutput(unittest.TestCase):
 
     @patch("backlogger.fetch_github_prs")
     def test_github_render_table(self, mock_fetch):
-        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        now = datetime.now(UTC).replace(tzinfo=None)
         stale_date = (now - timedelta(days=10)).strftime("%Y-%m-%dT%H:%M:%SZ")
         mock_fetch.return_value = [
             {
