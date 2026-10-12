@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import backlogger
+import entrypoint
 
 
 class TestOutput(unittest.TestCase):
@@ -222,3 +223,15 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(rows[0][3], "&#x1F534;")  # red/fail icon
         self.assertEqual(len(details_md_blocks), 1)
         self.assertIn("Show breakdown for: Stale PRs", details_md_blocks[0])
+
+    def test_check_render(self):
+        leaked = (
+            "<details>\n<summary>x</summary>\n\n"
+            "| Repository | Open PRs |\n| --- | --- |\n| a | 1 |\n\n</details>"
+        )
+        self.assertTrue(entrypoint.check_render(leaked))
+        clean = (
+            "<details>\n<summary>x</summary>\n"
+            "<table><tr><td>Repository</td></tr></table>\n</details>"
+        )
+        self.assertEqual(entrypoint.check_render(clean), [])
