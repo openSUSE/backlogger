@@ -14,8 +14,7 @@ import yaml
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-# Icons used for PASS or FAIL in the md file
-result_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
+pass_or_fail_dashboard_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
 reminder_text_common = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url})."
 reminder_text = "Please consider picking up this ticket or just set the ticket to the next lower priority."
 update_slo_text = "The ticket will be set to the next lower priority **{priority}**."
@@ -28,11 +27,11 @@ slo_priorities = {
     "Immediate": {
         "period": timedelta(days=1),
         "next_priority": {"id": 6, "name": "Urgent"},
-    },  # or <1 day for all subprojects of qa
+    },
     "Urgent": {
         "period": timedelta(weeks=1),
         "next_priority": {"id": 5, "name": "High"},
-    },  # or <1 day for all subprojects of qa
+    },
     "High": {
         "period": timedelta(days=calendar.monthrange(present.year, present.month)[1]),
         "next_priority": {"id": 4, "name": "Normal"},
@@ -46,8 +45,7 @@ slo_priorities = {
 }
 
 
-# Initialize a blank md file to replace the current README
-def initialize_md(data):
+def initialize_dashboard_markdown_file(data):
     with open("index.md", "w") as md:
         md.write("# Backlog Status\n\n")
         md.write(
@@ -384,7 +382,9 @@ def render_table(data):
                 "[" + conf["title"] + "](" + url + ")",
                 str(issue_count),
                 limits,
-                result_icons["pass"] if good else result_icons["fail"],
+                pass_or_fail_dashboard_icons["pass"]
+                if good
+                else pass_or_fail_dashboard_icons["fail"],
             ]
         )
         if details_md:
@@ -500,17 +500,12 @@ def render_influxdb(data):
 
 def escape_telegraf_str(value_to_escape, element):
     # See https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/#special-characters for escaping rules and where they apply
-    escaped_str = str(
-        value_to_escape
-    )  # especially for field values it can happen that we get an int
-    if (
-        element == "field value"
-    ):  # field values are the only thing where unique rules apply
+    escaped_str = str(value_to_escape)
+    if element == "field value":
         escaped_str = escaped_str.replace("\\", "\\\\")
         escaped_str = escaped_str.replace('"', '\\"')
         return escaped_str
 
-    # common rules applicable to everything else
     escaped_str = escaped_str.replace(",", "\\,")
     escaped_str = escaped_str.replace(" ", "\\ ")
     if element != "measurement":
@@ -522,7 +517,6 @@ def get_state():
     if os.environ.get("STATE_FOLDER"):
         old_state_file = os.path.join(os.environ["STATE_FOLDER"], "state.json")
         if os.path.exists(old_state_file):
-            # open state.json from last run, see if anything changed and send slack notification if needed
             with open(old_state_file, "r") as sj:
                 return json.load(sj)
 
@@ -544,13 +538,11 @@ def trigger_webhook(state, bad_queries):
         broken_queries = new_bad_queries - old_bad_queries
         msg = None
         if broken_queries:
-            # something new broke
             msg = ":red_circle: Some queries are exceeding limits:"
             for query in new_bad_queries:
                 qd = bad_queries[query]
                 msg += f"\n• {query} (Issue count {qd['issue_count']} exceeding limit of [{qd['limits']}])"
         elif fixed_queries and not new_bad_queries:
-            # this is the first green run so let's let everyone know
             msg = ":green_heart: All queries within limits again!"
         if msg and os.environ.get("WEBHOOK_URL"):
             requests.post(os.environ["WEBHOOK_URL"], json={"msg": msg})
@@ -573,13 +565,12 @@ if __name__ == "__main__":
             if switches.output == "influxdb":
                 print("\n".join(line for line in render_influxdb(data)))
             else:
-                initialize_md(data)
+                initialize_dashboard_markdown_file(data)
                 all_good, rows, bad_queries, details_md_blocks = render_table(data)
                 with open("index.md", "a") as md:
                     md.writelines("|".join(row) + "\n" for row in rows)
                     if details_md_blocks:
                         md.write("\n" + "\n".join(details_md_blocks) + "\n")
-                # open state.json from last run, see if anything changed and send webhook notification if needed
                 state = get_state()
                 trigger_webhook(state, bad_queries)
                 update_state(bad_queries)
