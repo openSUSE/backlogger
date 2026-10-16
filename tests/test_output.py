@@ -1,5 +1,6 @@
 import os
 import sys
+import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -235,3 +236,24 @@ class TestOutput(unittest.TestCase):
             "<table><tr><td>Repository</td></tr></table>\n</details>"
         )
         self.assertEqual(entrypoint.check_render(clean), [])
+
+    @patch("entrypoint.run_command")
+    @patch("entrypoint.shutil.copy")
+    def test_entrypoint_resolves_script_path(self, mock_copy, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            orig_cwd = os.getcwd()
+            os.chdir(tmpdir)
+            try:
+                with patch.dict(
+                    os.environ,
+                    {"INPUT_CONFIG": "custom.yaml", "INPUT_ARGS": "--exit-code"},
+                ):
+                    with self.assertRaises(SystemExit) as cm:
+                        entrypoint.main()
+                    self.assertEqual(cm.exception.code, 0)
+                backlogger_cmd = mock_run.call_args_list[1][0][0]
+                self.assertIn("backlogger.py custom.yaml --exit-code", backlogger_cmd)
+                self.assertTrue(os.path.isabs(backlogger_cmd.split()[1]))
+            finally:
+                os.chdir(orig_cwd)

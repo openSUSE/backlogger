@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import contextlib
 import json
 import os
 import re
@@ -30,7 +31,7 @@ def check_render(html_text):
 
 def main():
     config = os.environ.get("INPUT_CONFIG", "queries.yaml")
-    args = os.environ.get("INPUT_ARGS", "--exit-code")
+    args = os.environ.get("INPUT_ARGS", "")
     folder = os.environ.get("INPUT_FOLDER", "gh-pages")
     state_folder = os.environ.get("INPUT_STATE", "state")
 
@@ -68,7 +69,9 @@ def main():
         )
 
     print("Running backlogger.py...")
-    res = run_command(f"python3 backlogger.py {config} {args}", check=False)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    backlogger_path = os.path.join(script_dir, "backlogger.py")
+    res = run_command(f"python3 {backlogger_path} {config} {args}", check=False)
     backlog_status = res.returncode
 
     org = os.environ.get("GITHUB_REPOSITORY_OWNER", "")
@@ -89,12 +92,20 @@ def main():
     preview = "preview.png"
     preview_url = f"https://{org}.github.io/{repo}{extra}/{preview}?v={preview_date}"
 
-    status_color = "#55cc33" if backlog_status == 0 else "#cc3333"
+    has_bad_queries = False
+    if os.path.isfile("state.json"):
+        with (
+            contextlib.suppress(json.JSONDecodeError, OSError),
+            open("state.json") as f,
+        ):
+            has_bad_queries = bool(json.load(f))
+
+    status_color = "#cc3333" if (backlog_status != 0 or has_bad_queries) else "#55cc33"
 
     print("Rendering HTML...")
     os.makedirs(folder, exist_ok=True)
 
-    with open("head.html", "r") as f:
+    with open(os.path.join(script_dir, "head.html"), "r") as f:
         html_content = f.read()
 
     body_html = ""
@@ -106,7 +117,7 @@ def main():
     else:
         print("index.md not found!")
 
-    with open("foot.html", "r") as f:
+    with open(os.path.join(script_dir, "foot.html"), "r") as f:
         html_content += f.read()
 
     html_content = html_content.replace("STATUS_COLOR", status_color)

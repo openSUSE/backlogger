@@ -13,7 +13,7 @@ inputs:
   args:
     description: Additional arguments to the script
     required: false
-    default: '--exit-code'
+    default: ''
   folder:
     description: Output folder for HTML files
     required: false
@@ -32,10 +32,48 @@ inputs:
   github_token:
     description: GitHub token for commenting on issues and fetching state
     required: false
-    default: github.token
+    default: ''
 
 runs:
-  using: 'docker'
-  image: 'registry.opensuse.org/devel/openqa/backlogger/containers/opensuse/backlogger:latest'
-  args:
-    - "/github/workspace/entrypoint.py"
+  using: 'composite'
+  steps:
+    - name: Run Backlog Limits Checker
+      shell: bash
+      env:
+        REDMINE_API_KEY: ${{ inputs.redmine_api_key }}
+        WEBHOOK_URL: ${{ inputs.webhook_url }}
+        GITHUB_TOKEN: ${{ inputs.github_token != '' && inputs.github_token != 'github.token' && inputs.github_token || github.token }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ARGS: ${{ inputs.args }}
+        INPUT_FOLDER: ${{ inputs.folder }}
+        INPUT_STATE: ${{ inputs.state }}
+        INPUT_REDMINE_API_KEY: ${{ inputs.redmine_api_key }}
+        INPUT_WEBHOOK_URL: ${{ inputs.webhook_url }}
+        INPUT_GITHUB_TOKEN: ${{ inputs.github_token != '' && inputs.github_token != 'github.token' && inputs.github_token || github.token }}
+      run: |
+        temp_mount=()
+        if [ -n "${RUNNER_TEMP:-}" ]; then
+          temp_mount=(-v "$RUNNER_TEMP:$RUNNER_TEMP:ro")
+        fi
+        docker run --rm \
+          --workdir /github/workspace \
+          -v "$GITHUB_WORKSPACE":/github/workspace \
+          -v "${{ github.action_path }}":/backlogger:ro \
+          "${temp_mount[@]}" \
+          -e INPUT_CONFIG \
+          -e INPUT_ARGS \
+          -e INPUT_FOLDER \
+          -e INPUT_STATE \
+          -e INPUT_REDMINE_API_KEY \
+          -e INPUT_WEBHOOK_URL \
+          -e INPUT_GITHUB_TOKEN \
+          -e REDMINE_API_KEY \
+          -e WEBHOOK_URL \
+          -e GITHUB_TOKEN \
+          -e GITHUB_REPOSITORY \
+          -e GITHUB_REPOSITORY_OWNER \
+          -e GITHUB_EVENT_NAME \
+          -e GITHUB_EVENT_PATH \
+          -e GITHUB_WORKFLOW \
+          registry.opensuse.org/devel/openqa/backlogger/containers/opensuse/backlogger:latest \
+          python3 /backlogger/entrypoint.py
