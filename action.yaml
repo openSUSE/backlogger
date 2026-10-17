@@ -42,6 +42,7 @@ runs:
       env:
         REDMINE_API_KEY: ${{ inputs.redmine_api_key }}
         WEBHOOK_URL: ${{ inputs.webhook_url }}
+        # yamllint disable-line rule:line-length
         GITHUB_TOKEN: ${{ inputs.github_token != '' && inputs.github_token != 'github.token' && inputs.github_token || github.token }}
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_ARGS: ${{ inputs.args }}
@@ -49,7 +50,10 @@ runs:
         INPUT_STATE: ${{ inputs.state }}
         INPUT_REDMINE_API_KEY: ${{ inputs.redmine_api_key }}
         INPUT_WEBHOOK_URL: ${{ inputs.webhook_url }}
+        # yamllint disable-line rule:line-length
         INPUT_GITHUB_TOKEN: ${{ inputs.github_token != '' && inputs.github_token != 'github.token' && inputs.github_token || github.token }}
+        # yamllint disable-line rule:line-length
+        BACKLOGGER_IMAGE: registry.opensuse.org/devel/openqa/backlogger/containers/opensuse/backlogger:latest
       run: |
         temp_mount=()
         if [ -n "${RUNNER_TEMP:-}" ]; then
@@ -75,5 +79,5 @@ runs:
           -e GITHUB_EVENT_NAME \
           -e GITHUB_EVENT_PATH \
           -e GITHUB_WORKFLOW \
-          registry.opensuse.org/devel/openqa/backlogger/containers/opensuse/backlogger:latest \
+          "$BACKLOGGER_IMAGE" \
           python3 /backlogger/entrypoint.py

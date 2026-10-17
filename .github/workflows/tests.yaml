@@ -20,7 +20,8 @@ jobs:
       - name: Install Telegraf
         # yamllint disable rule:line-length
         run: |
-          wget --quiet https://dl.influxdata.com/telegraf/releases/telegraf_1.31.0-1_amd64.deb
+          url=https://dl.influxdata.com/telegraf/releases
+          wget --quiet "$url/telegraf_1.31.0-1_amd64.deb"
           sudo dpkg -i telegraf_1.31.0-1_amd64.deb
         # yamllint enable rule:line-length
       - name: Test InfluxDB output

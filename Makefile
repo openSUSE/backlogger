@@ -10,13 +10,17 @@ help: ## Display this help
 all: help
 
 .PHONY: test
-test: check-ruff ## Run ruff checks, then unit tests with pytest
+test: check-ruff check-yaml ## Run ruff and yamllint checks, then unit tests with pytest
 	python3 -m pytest
 
 .PHONY: check-ruff
 check-ruff: ## Run ruff lint and format checks
 	ruff check
 	ruff format --check
+
+.PHONY: check-yaml
+check-yaml: ## Run yamllint on all YAML files of the repo
+	yamllint .
 
 .PHONY: tidy
 tidy: ## Format code and autofix lint issues
