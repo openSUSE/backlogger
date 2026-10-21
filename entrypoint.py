@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 import markdown
@@ -13,6 +14,21 @@ import markdown
 
 def run_command(cmd, check=True):
     return subprocess.run(cmd, shell=True, check=check, text=True)
+
+
+def render_preview(index_html_path, png_path):
+    # ImageMagick 7 grants PDF the "write" right only, so rasterize with
+    # Ghostscript and let ImageMagick trim the resulting PNG.
+    work_dir = tempfile.mkdtemp()
+    pdf_path = os.path.join(work_dir, "preview.pdf")
+    page_png_path = os.path.join(work_dir, "preview.png")
+    run_command(f"weasyprint {index_html_path} {pdf_path}")
+    run_command(
+        f"gs -dNOPAUSE -dBATCH -dSAFER -sDEVICE=png16m -r72"
+        f" -sOutputFile={page_png_path} {pdf_path}"
+    )
+    run_command(f"magick {page_png_path} -trim {png_path}")
+    shutil.rmtree(work_dir)
 
 
 def check_render(html_text):
@@ -142,9 +158,7 @@ def main():
         sys.exit(2)
 
     print("Rendering PNG preview...")
-    run_command(
-        f"weasyprint {index_html_path} - | convert - -trim {os.path.join(folder, preview)}"
-    )
+    render_preview(index_html_path, os.path.join(folder, preview))
 
     if os.path.isfile("state.json"):
         print("Publishing state.json...")

@@ -1,6 +1,7 @@
 /index.md
 /gh-pages/
 /state/
+/state.json
 __pycache__/
 *.egg-info/
 .pytest_cache/

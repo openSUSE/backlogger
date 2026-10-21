@@ -1,4 +1,6 @@
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -227,6 +229,30 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(rows[0][3], "&#x1F534;")  # red/fail icon
         self.assertEqual(len(details_md_blocks), 1)
         self.assertIn("Show breakdown for: Stale PRs", details_md_blocks[0])
+
+    @unittest.skipUnless(
+        shutil.which("gs") and shutil.which("magick"),
+        "Ghostscript and ImageMagick are required",
+    )
+    def test_render_preview(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            html_path = os.path.join(tmpdir, "index.html")
+            png_path = os.path.join(tmpdir, "preview.png")
+            with open(html_path, "w") as f:
+                f.write("<html><body><h1>Backlog Status</h1></body></html>")
+            entrypoint.render_preview(html_path, png_path)
+            width, height = (
+                int(v)
+                for v in subprocess.check_output(
+                    ["magick", "identify", "-format", "%wx%h", png_path]
+                )
+                .decode()
+                .split("x")
+            )
+            self.assertGreater(width, 100)
+            self.assertGreater(height, 20)
+            self.assertLess(width, 595)
+            self.assertLess(height, 842)
 
     def test_check_render(self):
         leaked = (
