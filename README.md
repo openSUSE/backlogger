@@ -65,10 +65,10 @@ To securely generate and deploy previews for pull requests (including those from
 
 ### 1. Build Workflow
 
-Create `.github/workflows/preview-build.yml` triggered on the `pull_request` event:
+Create `.github/workflows/preview.yaml` triggered on the `pull_request` event:
 
 ```yaml
-name: Preview Build
+name: Backlog Limits Checker Build
 concurrency: preview-${{ github.ref }}
 on:
   pull_request:
@@ -83,32 +83,19 @@ jobs:
         uses: openSUSE/backlogger@main
         with:
           redmine_api_key: ${{ secrets.REDMINE_API_KEY }}
-      - name: Save PR info
-        run: |
-          mkdir -p pr-info
-          echo "${{ github.event.number }}" > pr-info/pr-number
-          echo "${{ github.event.action }}" > pr-info/pr-action
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pr-info
-          path: pr-info/
-      - name: Upload preview artifact
-        if: github.event.action != 'closed'
-        uses: actions/upload-artifact@v4
-        with:
-          name: preview-artifact
-          path: gh-pages/
+      - name: Publish preview artifacts
+        uses: openSUSE/backlogger/.github/actions/preview-artifacts@main
 ```
 
 ### 2. Deploy Workflow
 
-Create `.github/workflows/preview-deploy.yml` triggered on the `workflow_run` event:
+Create `.github/workflows/preview-deploy.yaml` triggered on the `workflow_run` event:
 
 ```yaml
-name: Preview Deploy
+name: Backlog Limits Checker Deploy
 on:
   workflow_run:
-    workflows: ["Preview Build"]
+    workflows: ["Backlog Limits Checker Build"]
     types: [completed]
 jobs:
   deploy:
