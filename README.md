@@ -102,7 +102,7 @@ jobs:
 
 ### 2. Deploy Workflow
 
-Create `.github/workflows/preview-deploy.yml` triggered on the `workflow_run` event:
+Create `.github/workflows/preview-deploy.yml` triggered on the `workflow_run` event. The downloaded artifact is controlled by the pull request, so validate both values before they reach `$GITHUB_OUTPUT` or the action inputs:
 
 ```yaml
 name: Preview Deploy
@@ -122,10 +122,24 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           name: pr-info
           path: pr-info
-      - id: pr-info
+      - name: Read PR info
+        id: pr-info
         run: |
-          echo "number=$(cat pr-info/pr-number)" >> "$GITHUB_OUTPUT"
-          echo "action=$(cat pr-info/pr-action)" >> "$GITHUB_OUTPUT"
+          number=$(cat pr-info/pr-number)
+          if ! [[ "$number" =~ ^[1-9][0-9]*$ ]]; then
+            echo "Error: Invalid PR number: $number" >&2
+            exit 1
+          fi
+          action=$(cat pr-info/pr-action)
+          case "$action" in
+            opened|reopened|synchronize|closed) ;;
+            *)
+              echo "Error: Invalid PR action: $action" >&2
+              exit 1
+              ;;
+          esac
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "action=$action" >> "$GITHUB_OUTPUT"
       - name: Download preview
         if: steps.pr-info.outputs.action != 'closed'
         uses: actions/download-artifact@v4
