@@ -1,0 +1,28 @@
+---
+name: 'PR Preview Artifacts'
+description: 'Publish PR preview artifacts and metadata for preview deployment'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Save PR info
+      shell: bash
+      run: |
+        mkdir -p pr-info
+        echo "${{ github.event.number }}" > pr-info/pr-number
+        echo "${{ github.event.action }}" > pr-info/pr-action
+
+    - name: Upload PR info
+      # yamllint disable-line rule:line-length
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: pr-info
+        path: pr-info/
+
+    - name: Upload preview artifact
+      if: github.event.action != 'closed'
+      # yamllint disable-line rule:line-length
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+      with:
+        name: preview-artifact
+        path: gh-pages/
