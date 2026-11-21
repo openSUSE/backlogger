@@ -3,6 +3,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -12,23 +13,30 @@ import time
 import markdown
 
 
-def run_command(cmd, check=True):
-    return subprocess.run(cmd, shell=True, check=check, text=True)
+def run_command(cmd, check=True, stdout=None):
+    return subprocess.run(cmd, check=check, text=True, stdout=stdout)
 
 
 def render_preview(index_html_path, png_path):
     # ImageMagick 7 grants PDF the "write" right only, so rasterize with
     # Ghostscript and let ImageMagick trim the resulting PNG.
-    work_dir = tempfile.mkdtemp()
-    pdf_path = os.path.join(work_dir, "preview.pdf")
-    page_png_path = os.path.join(work_dir, "preview.png")
-    run_command(f"weasyprint {index_html_path} {pdf_path}")
-    run_command(
-        f"gs -dNOPAUSE -dBATCH -dSAFER -sDEVICE=png16m -r72"
-        f" -sOutputFile={page_png_path} {pdf_path}"
-    )
-    run_command(f"magick {page_png_path} -trim {png_path}")
-    shutil.rmtree(work_dir)
+    with tempfile.TemporaryDirectory() as work_dir:
+        pdf_path = os.path.join(work_dir, "preview.pdf")
+        page_png_path = os.path.join(work_dir, "preview.png")
+        run_command(["weasyprint", index_html_path, pdf_path])
+        run_command(
+            [
+                "gs",
+                "-dNOPAUSE",
+                "-dBATCH",
+                "-dSAFER",
+                "-sDEVICE=png16m",
+                "-r72",
+                f"-sOutputFile={page_png_path}",
+                pdf_path,
+            ]
+        )
+        run_command(["magick", page_png_path, "-trim", png_path])
 
 
 def check_render(html_text):
@@ -63,20 +71,23 @@ def main():
 
     # Configure git to trust the workspace directory to avoid dubious ownership errors in container
     run_command(
-        "git config --global --add safe.directory /github/workspace", check=False
+        ["git", "config", "--global", "--add", "safe.directory", "/github/workspace"],
+        check=False,
     )
 
     if os.path.isdir(".git"):
         print(f"Fetching previous state.json from branch: {folder}")
-        run_command(f"git fetch origin {folder}", check=False)
+        run_command(["git", "fetch", "origin", folder], check=False)
         os.makedirs(state_folder, exist_ok=True)
-        res = run_command(
-            f"git show origin/{folder}:state.json > {state_folder}/state.json",
-            check=False,
-        )
+        state_file_path = os.path.join(state_folder, "state.json")
+        with open(state_file_path, "w") as sf:
+            res = run_command(
+                ["git", "show", f"origin/{folder}:state.json"],
+                check=False,
+                stdout=sf,
+            )
         if res.returncode != 0:
             print(f"No previous state.json found on branch {folder}")
-            state_file_path = os.path.join(state_folder, "state.json")
             if os.path.exists(state_file_path):
                 os.remove(state_file_path)
     else:
@@ -87,12 +98,17 @@ def main():
     print("Running backlogger.py...")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     backlogger_path = os.path.join(script_dir, "backlogger.py")
-    res = run_command(f"python3 {backlogger_path} {config} {args}", check=False)
+    backlogger_cmd = ["python3", backlogger_path, config] + shlex.split(args)
+    res = run_command(backlogger_cmd, check=False)
     backlog_status = res.returncode
 
     org = os.environ.get("GITHUB_REPOSITORY_OWNER", "")
     github_repository = os.environ.get("GITHUB_REPOSITORY", "")
-    repo = github_repository.split("/")[1] if github_repository else ""
+    repo = (
+        github_repository.split("/")[1]
+        if "/" in github_repository
+        else github_repository
+    )
 
     extra = ""
     event_name = os.environ.get("GITHUB_EVENT_NAME", "")

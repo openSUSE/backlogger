@@ -282,7 +282,46 @@ class TestOutput(unittest.TestCase):
                         entrypoint.main()
                     self.assertEqual(cm.exception.code, 0)
                 backlogger_cmd = mock_run.call_args_list[1][0][0]
-                self.assertIn("backlogger.py custom.yaml --exit-code", backlogger_cmd)
-                self.assertTrue(os.path.isabs(backlogger_cmd.split()[1]))
+                self.assertEqual(backlogger_cmd[0], "python3")
+                self.assertTrue(os.path.isabs(backlogger_cmd[1]))
+                self.assertTrue(backlogger_cmd[1].endswith("backlogger.py"))
+                self.assertEqual(backlogger_cmd[2:], ["custom.yaml", "--exit-code"])
             finally:
                 os.chdir(orig_cwd)
+
+    def test_run_command_list_args(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            out_file = os.path.join(tmpdir, "out.txt")
+            with open(out_file, "w") as f:
+                res = entrypoint.run_command(
+                    [
+                        "python3",
+                        "-c",
+                        "import sys; print(sys.argv[1])",
+                        "$NOT_EXPANDED; echo leak",
+                    ],
+                    stdout=f,
+                )
+            self.assertEqual(res.returncode, 0)
+            with open(out_file) as f:
+                content = f.read().strip()
+            self.assertEqual(content, "$NOT_EXPANDED; echo leak")
+
+    def test_render_preview_cleans_up_on_error(self):
+        created_dirs = []
+        orig_tempdir = tempfile.TemporaryDirectory
+
+        def tracking_tempdir(*args, **kwargs):
+            td = orig_tempdir(*args, **kwargs)
+            created_dirs.append(td.name)
+            return td
+
+        with (
+            patch("tempfile.TemporaryDirectory", side_effect=tracking_tempdir),
+            patch("entrypoint.run_command", side_effect=RuntimeError("render failed")),
+            self.assertRaises(RuntimeError),
+        ):
+            entrypoint.render_preview("index.html", "preview.png")
+
+        self.assertEqual(len(created_dirs), 1)
+        self.assertFalse(os.path.exists(created_dirs[0]))
