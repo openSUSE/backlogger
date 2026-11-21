@@ -3,10 +3,12 @@ name: Unit Tests
 # yamllint disable-line rule:truthy
 on: [push, pull_request]
 jobs:
-  schedule:
+  test:
     runs-on: ubuntu-latest
     steps:
+      # yamllint disable-line rule:line-length
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # yamllint disable-line rule:line-length
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
         with:
           python-version: 3.12
@@ -16,8 +18,10 @@ jobs:
           pip install -e ".[dev]"
       - run: make test
       - name: Install Telegraf
+        # yamllint disable rule:line-length
         run: |
-          wget -q https://dl.influxdata.com/telegraf/releases/telegraf_1.31.0-1_amd64.deb
+          wget --quiet https://dl.influxdata.com/telegraf/releases/telegraf_1.31.0-1_amd64.deb
           sudo dpkg -i telegraf_1.31.0-1_amd64.deb
+        # yamllint enable rule:line-length
       - name: Test InfluxDB output
         run: telegraf --test --config tests/slo.conf
