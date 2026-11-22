@@ -64,6 +64,13 @@ def initialize_dashboard_markdown_file(data):
 
 REQUEST_TIMEOUT_SECONDS = 30
 JSON_HEADERS = {"Content-Type": "application/json"}
+QUERY_ERRORS = (
+    requests.RequestException,
+    KeyError,
+    TypeError,
+    ValueError,
+    AttributeError,
+)
 
 
 def http_request(method, url, body, headers, attempts=7):
@@ -182,18 +189,14 @@ def _update_issue_priority(poo_id, priority_current, poo_reminder_state, msg):
 
 
 def list_issues(conf, root):
-    try:
-        for poo in root["issues"]:
-            poo_reminder_state = {
-                "last_reminder": datetime.min.replace(tzinfo=UTC).replace(tzinfo=None),
-                "has_repeat_reminder": False,
-            }
-            if "updated_on" in conf["query"]:
-                issue_reminder(conf, poo, poo_reminder_state)
-    except KeyError:
-        print("There was an error retrieving the issues " + conf["title"])
-    else:
-        return int(root["total_count"])
+    for poo in root["issues"]:
+        poo_reminder_state = {
+            "last_reminder": datetime.min.replace(tzinfo=UTC).replace(tzinfo=None),
+            "has_repeat_reminder": False,
+        }
+        if "updated_on" in conf["query"]:
+            issue_reminder(conf, poo, poo_reminder_state)
+    return int(root["total_count"])
 
 
 def retrieve_journals(poo):
@@ -217,11 +220,6 @@ def reminder_exists(poo, journals, state):
             state["has_repeat_reminder"] = True
             return True
     state["has_repeat_reminder"] = False
-    return False
-
-
-def failure_more(conf):
-    print(conf["title"] + " has more than " + str(conf["max"]) + " tickets!")
     return False
 
 
@@ -266,16 +264,33 @@ def fetch_github_prs(repos):
     return all_items
 
 
+def limits_ok(conf, issue_count):
+    if "max" in conf and issue_count > conf["max"]:
+        return False
+    return not ("min" in conf and issue_count < conf["min"])
+
+
+def error_detail(error):
+    if isinstance(error, requests.HTTPError) and error.response is not None:
+        return f"HTTPError {error.response.status_code}"
+    return (
+        type(error).__name__
+        if isinstance(error, requests.RequestException)
+        else str(error)
+    )
+
+
+def record_query_error(title, error):
+    detail = error_detail(error)
+    sys.stderr.write(f"Error querying backlog {title}: {detail}\n")
+    return (False, None, f"\n**Error querying backlog {title}**: {detail}\n", detail)
+
+
 def check_github_backlog(conf):
     repos = conf["repos"]
     stale_days = conf.get("stale_days", 0)
 
-    try:
-        items = fetch_github_prs(repos)
-    except (requests.RequestException, ValueError) as e:
-        sys.stderr.write(f"Error fetching GitHub PRs for {conf['title']}: {e}\n")
-        return (False, 0, f"\n**Error fetching GitHub PRs for {conf['title']}**: {e}\n")
-
+    items = fetch_github_prs(repos)
     repo_prs = {repo: [] for repo in repos}
     for item in items:
         parts = item["html_url"].split("/")
@@ -306,11 +321,7 @@ def check_github_backlog(conf):
 
     issue_count = stale_prs_count if stale_days > 0 else len(items)
 
-    good = True
-    if "max" in conf:
-        good = not (
-            issue_count > conf["max"] or "min" in conf and issue_count < conf["min"]
-        )
+    good = limits_ok(conf, issue_count)
 
     def sort_key(repo):
         open_count = len(repo_prs[repo])
@@ -358,20 +369,18 @@ def check_github_backlog(conf):
     details_lines.append("</details>")
     details_md = "\n".join(details_lines)
 
-    return (good, issue_count, details_md)
+    return (good, issue_count, details_md, None)
 
 
 def check_backlog(conf):
-    if conf.get("type") == "github":
-        return check_github_backlog(conf)
-    root = json_rest("GET", data["api"] + "?" + conf["query"])
-    issue_count = list_issues(conf, root)
-    good = True
-    if "max" in conf:
-        good = not (
-            issue_count > conf["max"] or "min" in conf and issue_count < conf["min"]
-        )
-    return (good, issue_count, None)
+    try:
+        if conf.get("type") == "github":
+            return check_github_backlog(conf)
+        root = json_rest("GET", data["api"] + "?" + conf["query"])
+        issue_count = list_issues(conf, root)
+        return (limits_ok(conf, issue_count), issue_count, None, None)
+    except QUERY_ERRORS as e:
+        return record_query_error(conf["title"], e)
 
 
 def render_table(data):
@@ -380,7 +389,8 @@ def render_table(data):
     bad_queries = {}
     details_md_blocks = []
     for conf in data["queries"]:
-        good, issue_count, details_md = check_backlog(conf)
+        good, issue_count, details_md, query_error = check_backlog(conf)
+        title = conf["title"]
         if conf.get("type") == "github":
             url = make_github_search_url(conf["repos"], conf.get("stale_days", 0))
         else:
@@ -390,8 +400,8 @@ def render_table(data):
             limits += ", >" + str(conf["min"] - 1)
         rows.append(
             [
-                "[" + conf["title"] + "](" + url + ")",
-                str(issue_count),
+                "[" + title + "](" + url + ")",
+                str(issue_count) if query_error is None else "-",
                 limits,
                 pass_or_fail_dashboard_icons["pass"]
                 if good
@@ -402,11 +412,14 @@ def render_table(data):
             details_md_blocks.append(details_md)
         if not good:
             all_good = False
-            bad_queries[conf["title"]] = {
+            entry = {
                 "url": url,
                 "issue_count": issue_count,
                 "limits": limits,
             }
+            if query_error is not None:
+                entry["error"] = query_error
+            bad_queries[title] = entry
     return (all_good, rows, bad_queries, details_md_blocks)
 
 
@@ -532,6 +545,29 @@ def get_state():
                 return json.load(sj)
 
 
+def is_query_error(entry):
+    return "error" in entry
+
+
+def has_query_error(bad_queries):
+    return any(map(is_query_error, bad_queries.values()))
+
+
+def announced_breaches(bad_queries):
+    return {q: d for q, d in bad_queries.items() if not is_query_error(d)}
+
+
+def carry_pending_recoveries(state, bad_queries):
+    if not state or not has_query_error(bad_queries):
+        return bad_queries
+    pending = {
+        q: d
+        for q, d in announced_breaches(state.get("bad_queries", {})).items()
+        if q not in bad_queries or is_query_error(bad_queries[q])
+    }
+    return {**bad_queries, **pending}
+
+
 def update_state(bad_queries):
     with open("state.json", "w") as sj:
         state = {
@@ -542,31 +578,33 @@ def update_state(bad_queries):
 
 
 def trigger_webhook(state, bad_queries):
-    if state:
-        old_bad_queries = set(state["bad_queries"].keys())
-        new_bad_queries = set(bad_queries.keys())
-        fixed_queries = old_bad_queries - new_bad_queries
-        broken_queries = new_bad_queries - old_bad_queries
-        msg = None
-        if broken_queries:
-            msg = ":red_circle: Some queries are exceeding limits:"
-            for query in sorted(new_bad_queries):
-                qd = bad_queries[query]
-                msg += f"\n• {query} (Issue count {qd['issue_count']} exceeding limit of [{qd['limits']}])"
-        elif fixed_queries and not new_bad_queries:
-            msg = ":green_heart: All queries within limits again!"
-        if msg and os.environ.get("WEBHOOK_URL"):
-            try:
-                response = http_request(
-                    "POST",
-                    os.environ["WEBHOOK_URL"],
-                    body=json.dumps({"msg": msg}),
-                    headers=JSON_HEADERS,
-                    attempts=2,
-                )
-                response.raise_for_status()
-            except requests.RequestException as e:
-                sys.stderr.write(f"Webhook notification failed: {type(e).__name__}\n")
+    if not state:
+        return
+    query_failed = has_query_error(bad_queries)
+    old_bad_queries = set(announced_breaches(state.get("bad_queries", {})))
+    new_bad_queries = set(announced_breaches(bad_queries))
+    fixed_queries = old_bad_queries - new_bad_queries
+    broken_queries = new_bad_queries - old_bad_queries
+    msg = None
+    if broken_queries:
+        msg = ":red_circle: Some queries are exceeding limits:"
+        for query in sorted(new_bad_queries):
+            qd = bad_queries[query]
+            msg += f"\n• {query} (Issue count {qd['issue_count']} exceeding limit of [{qd['limits']}])"
+    elif fixed_queries and not new_bad_queries and not query_failed:
+        msg = ":green_heart: All queries within limits again!"
+    if msg and os.environ.get("WEBHOOK_URL"):
+        try:
+            response = http_request(
+                "POST",
+                os.environ["WEBHOOK_URL"],
+                body=json.dumps({"msg": msg}),
+                headers=JSON_HEADERS,
+                attempts=2,
+            )
+            response.raise_for_status()
+        except requests.RequestException as e:
+            sys.stderr.write(f"Webhook notification failed: {type(e).__name__}\n")
 
 
 if __name__ == "__main__":
@@ -594,7 +632,7 @@ if __name__ == "__main__":
                         md.write("\n" + "\n".join(details_md_blocks) + "\n")
                 state = get_state()
                 trigger_webhook(state, bad_queries)
-                update_state(bad_queries)
+                update_state(carry_pending_recoveries(state, bad_queries))
     except FileNotFoundError:
         sys.exit(f"Configuration file {switches.config} not found")
     if switches.exit_code and not all_good:
