@@ -108,20 +108,28 @@ def json_rest(method, url, rest=None):
     return r.json() if r.text else None
 
 
-def issue_reminder(conf, poo, poo_reminder_state):
-    priority = poo["priority"]["name"]
-    msg = " ".join(
-        [reminder_text_common.format(priority=priority, url=data["url"]), reminder_text]
-    )
+def reminder_message(conf, priority):
     if "comment" in conf:
-        msg = conf["comment"]
-    if data["reminder-comment-on-issues"]:
+        return conf["comment"]
+    return " ".join(
+        [
+            reminder_text_common.format(priority=priority, url=data["url"]),
+            reminder_text,
+        ]
+    )
+
+
+def issue_reminder(conf, poo, poo_reminder_state):
+    if not data["reminder-comment-on-issues"]:
+        return True
+    try:
+        priority = poo["priority"]["name"]
+        msg = reminder_message(conf, priority)
         journals = retrieve_journals(poo)
         if journals is None:
             sys.stderr.write(
-                "API for {} returned None, skipping reminder".format(poo["id"])
+                "API for {} returned None, skipping reminder\n".format(poo["id"])
             )
-            return
         elif reminder_exists(poo, journals, poo_reminder_state):
             print(
                 "Skipping reminder for {}: a similar reminder already exists".format(
@@ -134,10 +142,15 @@ def issue_reminder(conf, poo, poo_reminder_state):
                         poo["id"]
                     )
                 )
-                return
-            _update_issue_priority(poo["id"], priority, poo_reminder_state, msg)
-            return
-        _send_first_reminder(poo["id"], msg)
+            else:
+                _update_issue_priority(poo["id"], priority, poo_reminder_state, msg)
+        else:
+            _send_first_reminder(poo["id"], msg)
+        return True
+    except QUERY_ERRORS as e:
+        poo_id = poo.get("id", "?") if isinstance(poo, dict) else "?"
+        sys.stderr.write(f"Reminder for {poo_id} failed: {error_detail(e)}\n")
+        return not is_transport_error(e)
 
 
 def _send_first_reminder(poo_id, msg):
@@ -194,8 +207,10 @@ def list_issues(conf, root):
             "last_reminder": datetime.min.replace(tzinfo=UTC).replace(tzinfo=None),
             "has_repeat_reminder": False,
         }
-        if "updated_on" in conf["query"]:
-            issue_reminder(conf, poo, poo_reminder_state)
+        if "updated_on" in conf["query"] and not issue_reminder(
+            conf, poo, poo_reminder_state
+        ):
+            break
     return int(root["total_count"])
 
 
@@ -268,6 +283,17 @@ def limits_ok(conf, issue_count):
     if "max" in conf and issue_count > conf["max"]:
         return False
     return not ("min" in conf and issue_count < conf["min"])
+
+
+def is_transport_error(error):
+    return isinstance(
+        error,
+        (
+            requests.ConnectionError,
+            requests.Timeout,
+            requests.exceptions.RetryError,
+        ),
+    )
 
 
 def error_detail(error):
