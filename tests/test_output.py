@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -7,109 +8,125 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
+import pytest
+import requests
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import backlogger
 import entrypoint
 
+DEFAULT_WEBHOOK_URL = "https://example.com/hook"
+
+
+def make_backlog_data(queries):
+    return {
+        "api": "https://example.com/issues.json",
+        "web": "https://example.com/issues",
+        "team": "Awesome Team",
+        "queries": queries,
+    }
+
 
 class TestOutput(unittest.TestCase):
-    def setUp(self):
-        data = {
-            "api": "https://example.com/issues.json",
-            "web": "https://example.com/issues",
-            "team": "Awesome Team",
-            "queries": [{"title": "Workable Backlog", "query": "query_id=123"}],
-        }
-        backlogger.data = data
+    @pytest.fixture(autouse=True)
+    def capsys(self, capsys):
+        self.capsys = capsys
 
-    def test_influxdb(self):
-        backlogger.json_rest = MagicMock(
-            side_effect=[
-                {
-                    "issue_statuses": [
-                        {"name": "In Progress", "id": 2},
-                        {"name": "Feedback", "id": 4},
-                    ]
-                },
-                {
-                    "issues": [
-                        {
-                            "id": 1,
-                            "status": {"name": "In Progress"},
-                            "created_on": "2022-12-12T07:51:24Z",
-                            "updated_on": "2022-12-19T12:34:52Z",
-                        },
-                        {
-                            "id": 2,
-                            "status": {"name": "In Progress"},
-                            "created_on": "2022-12-06T21:32:03Z",
-                            "updated_on": "2022-12-09T13:19:29Z",
-                        },
-                        {
-                            "id": 3,
-                            "status": {"name": "Feedback"},
-                            "created_on": "2022-12-06T00:00:00Z",
-                            "updated_on": "2022-12-14T00:00:00Z",
-                        },
-                        {
-                            "id": 4,
-                            "status": {"name": "Resolved"},
-                            "created_on": "2022-12-06T13:57:05Z",
-                            "updated_on": "2022-12-22T13:12:22Z",
-                        },
-                        {
-                            "id": 5,
-                            "status": {"name": "Resolved"},
-                            "created_on": "2022-12-08T10:00:00Z",
-                            "updated_on": "2022-12-15T10:00:00Z",
-                        },
-                    ],
-                    "total_count": 5,
-                },
-                {
-                    "issue": {
-                        "journals": [
-                            {
-                                "details": [{"name": "status_id", "new_value": "2"}],
-                                "created_on": "2022-12-10T13:57:05Z",
-                            },
-                            {
-                                "details": [
-                                    {
-                                        "name": "status_id",
-                                        "old_value": "2",
-                                        "new_value": "3",
-                                    }
-                                ],
-                                "created_on": "2022-12-12T13:57:05Z",
-                            },
-                        ]
-                    }
-                },
-                {
-                    "issue": {
-                        "journals": [
-                            {
-                                "details": [{"name": "status_id", "new_value": "2"}],
-                                "created_on": "2022-12-10T10:00:00Z",
-                            },
-                            {
-                                "details": [
-                                    {
-                                        "name": "status_id",
-                                        "old_value": "2",
-                                        "new_value": "3",
-                                    }
-                                ],
-                                "created_on": "2022-12-12T10:00:00Z",
-                            },
-                        ]
-                    }
-                },
-            ]
+    def setUp(self):
+        data = make_backlog_data(
+            [{"title": "Workable Backlog", "query": "query_id=123"}]
         )
-        backlogger._today_nanoseconds = MagicMock(side_effect=[23])
+        patcher = patch.object(backlogger, "data", data)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @patch.object(backlogger, "_today_nanoseconds", return_value=23)
+    @patch("backlogger.json_rest")
+    def test_influxdb(self, mock_json_rest, mock_today):
+        mock_json_rest.side_effect = [
+            {
+                "issue_statuses": [
+                    {"name": "In Progress", "id": 2},
+                    {"name": "Feedback", "id": 4},
+                ]
+            },
+            {
+                "issues": [
+                    {
+                        "id": 1,
+                        "status": {"name": "In Progress"},
+                        "created_on": "2022-12-12T07:51:24Z",
+                        "updated_on": "2022-12-19T12:34:52Z",
+                    },
+                    {
+                        "id": 2,
+                        "status": {"name": "In Progress"},
+                        "created_on": "2022-12-06T21:32:03Z",
+                        "updated_on": "2022-12-09T13:19:29Z",
+                    },
+                    {
+                        "id": 3,
+                        "status": {"name": "Feedback"},
+                        "created_on": "2022-12-06T00:00:00Z",
+                        "updated_on": "2022-12-14T00:00:00Z",
+                    },
+                    {
+                        "id": 4,
+                        "status": {"name": "Resolved"},
+                        "created_on": "2022-12-06T13:57:05Z",
+                        "updated_on": "2022-12-22T13:12:22Z",
+                    },
+                    {
+                        "id": 5,
+                        "status": {"name": "Resolved"},
+                        "created_on": "2022-12-08T10:00:00Z",
+                        "updated_on": "2022-12-15T10:00:00Z",
+                    },
+                ],
+                "total_count": 5,
+            },
+            {
+                "issue": {
+                    "journals": [
+                        {
+                            "details": [{"name": "status_id", "new_value": "2"}],
+                            "created_on": "2022-12-10T13:57:05Z",
+                        },
+                        {
+                            "details": [
+                                {
+                                    "name": "status_id",
+                                    "old_value": "2",
+                                    "new_value": "3",
+                                }
+                            ],
+                            "created_on": "2022-12-12T13:57:05Z",
+                        },
+                    ]
+                }
+            },
+            {
+                "issue": {
+                    "journals": [
+                        {
+                            "details": [{"name": "status_id", "new_value": "2"}],
+                            "created_on": "2022-12-10T10:00:00Z",
+                        },
+                        {
+                            "details": [
+                                {
+                                    "name": "status_id",
+                                    "old_value": "2",
+                                    "new_value": "3",
+                                }
+                            ],
+                            "created_on": "2022-12-12T10:00:00Z",
+                        },
+                    ]
+                }
+            },
+        ]
         self.assertEqual(
             backlogger.render_influxdb(backlogger.data),
             [
@@ -129,8 +146,8 @@ class TestOutput(unittest.TestCase):
         for scenario in scenarios:
             query = {"title": "Workable Backlog", "query": "query_id=123"}
             query.update(scenario["data"])
-            backlogger.data["queries"] = [query]
-            backlogger.json_rest = MagicMock(
+            test_data = make_backlog_data([query])
+            mock_json_rest = MagicMock(
                 side_effect=[
                     {
                         "issues": [],
@@ -138,17 +155,21 @@ class TestOutput(unittest.TestCase):
                     },
                 ]
             )
-            self.assertEqual(
-                backlogger.render_table(backlogger.data)[1],
-                [
+            with (
+                patch.object(backlogger, "data", test_data),
+                patch("backlogger.json_rest", mock_json_rest),
+            ):
+                self.assertEqual(
+                    backlogger.render_table(backlogger.data)[1],
                     [
-                        "[Workable Backlog](https://example.com/issues?query_id=123)",
-                        "2",
-                        scenario["limit"],
-                        scenario["icon"],
+                        [
+                            "[Workable Backlog](https://example.com/issues?query_id=123)",
+                            "2",
+                            scenario["limit"],
+                            scenario["icon"],
+                        ],
                     ],
-                ],
-            )
+                )
 
     @patch("backlogger.fetch_github_prs")
     def test_github_backlog(self, mock_fetch):
@@ -253,6 +274,118 @@ class TestOutput(unittest.TestCase):
             self.assertGreater(height, 20)
             self.assertLess(width, 595)
             self.assertLess(height, 842)
+
+    @patch("backlogger.http_request")
+    def test_webhook_without_state_posts_nothing(self, mock_http_request):
+        with patch.dict(os.environ, {"WEBHOOK_URL": DEFAULT_WEBHOOK_URL}, clear=True):
+            backlogger.trigger_webhook(
+                None, {"Workable Backlog": {"limits": "<5", "issue_count": 10}}
+            )
+        mock_http_request.assert_not_called()
+
+    @patch("backlogger.http_request")
+    def test_webhook_connection_failure_is_logged_without_raising(
+        self, mock_http_request
+    ):
+        mock_http_request.side_effect = requests.ConnectionError("webhook unreachable")
+        with patch.dict(os.environ, {"WEBHOOK_URL": DEFAULT_WEBHOOK_URL}):
+            backlogger.trigger_webhook(
+                {"bad_queries": {}},
+                {"Workable Backlog": {"limits": "<5", "issue_count": 10}},
+            )
+        _, err = self.capsys.readouterr()
+        self.assertEqual(err, "Webhook notification failed: ConnectionError\n")
+
+    @patch("backlogger.http_request")
+    def test_webhook_non_2xx_response_is_logged_without_raising(
+        self, mock_http_request
+    ):
+        response = MagicMock()
+        response.raise_for_status.side_effect = requests.HTTPError("400 Client Error")
+        mock_http_request.return_value = response
+        with patch.dict(os.environ, {"WEBHOOK_URL": DEFAULT_WEBHOOK_URL}):
+            backlogger.trigger_webhook(
+                {"bad_queries": {}},
+                {"Workable Backlog": {"limits": "<5", "issue_count": 10}},
+            )
+        _, err = self.capsys.readouterr()
+        self.assertEqual(err, "Webhook notification failed: HTTPError\n")
+        mock_http_request.return_value.raise_for_status.assert_called_once()
+
+    @patch("backlogger.http_request")
+    def test_webhook_failure_does_not_leak_url_token_to_stderr(self, mock_http_request):
+        secret_token = "SECRET_TOKEN_XYZ_123"
+        webhook_url = f"https://mattermost.example.com/hooks/{secret_token}"
+        mock_http_request.side_effect = requests.ConnectionError(
+            f"HTTPSConnectionPool(host='mattermost.example.com', port=443): Max retries exceeded with url: /hooks/{secret_token}"
+        )
+        with patch.dict(os.environ, {"WEBHOOK_URL": webhook_url}):
+            backlogger.trigger_webhook(
+                {"bad_queries": {}},
+                {"Workable Backlog": {"limits": "<5", "issue_count": 10}},
+            )
+        _, err = self.capsys.readouterr()
+        self.assertEqual(err, "Webhook notification failed: ConnectionError\n")
+        self.assertNotIn(secret_token, err)
+
+    def test_webhook_json_content_type_and_sorted_lines(self):
+        state = {"bad_queries": {}}
+        bad_queries = {
+            "Workable Backlog": {"limits": "<5", "issue_count": 10},
+            "Second Query": {"limits": "<3", "issue_count": 9},
+        }
+        mock_http_request = MagicMock()
+        with (
+            patch.dict(os.environ, {"WEBHOOK_URL": "https://hook.example.com"}),
+            patch("backlogger.http_request", mock_http_request),
+        ):
+            backlogger.trigger_webhook(state, bad_queries)
+        method, url = mock_http_request.call_args.args
+        kwargs = mock_http_request.call_args.kwargs
+        self.assertEqual(method, "POST")
+        self.assertEqual(url, "https://hook.example.com")
+        self.assertEqual(kwargs["headers"], backlogger.JSON_HEADERS)
+        self.assertEqual(
+            json.loads(kwargs["body"])["msg"],
+            ":red_circle: Some queries are exceeding limits:\n"
+            "• Second Query (Issue count 9 exceeding limit of [<3])\n"
+            "• Workable Backlog (Issue count 10 exceeding limit of [<5])",
+        )
+
+    def test_webhook_missing_url_no_request(self):
+        state = {"bad_queries": {}}
+        bad_queries = {"Workable Backlog": {"limits": "<5", "issue_count": 10}}
+        mock_http_request = MagicMock()
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("backlogger.http_request", mock_http_request),
+        ):
+            backlogger.trigger_webhook(state, bad_queries)
+        mock_http_request.assert_not_called()
+
+    @patch("backlogger.requests.Session")
+    def test_http_request_passes_timeout(self, mock_session):
+        session = mock_session.return_value.__enter__.return_value
+        backlogger.http_request(
+            "GET", "https://example.com/issues.json", body=None, headers={}
+        )
+        self.assertEqual(
+            session.request.call_args.kwargs["timeout"],
+            backlogger.REQUEST_TIMEOUT_SECONDS,
+        )
+
+    @patch("backlogger.requests.Session")
+    def test_http_request_retries_status_errors_only_for_get(self, mock_session):
+        session = mock_session.return_value.__enter__.return_value
+        backlogger.http_request(
+            "PUT", "https://example.com/issues/1.json", body="{}", headers={}
+        )
+        mounted = session.mount.call_args_list
+        self.assertEqual([c.args[0] for c in mounted], ["http://", "https://"])
+        for c in mounted:
+            retries = c.args[1].max_retries
+            self.assertFalse(retries.is_retry("PUT", 503))
+            self.assertTrue(retries.is_retry("GET", 503))
 
     def test_check_render(self):
         leaked = (

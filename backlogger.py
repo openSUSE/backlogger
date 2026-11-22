@@ -7,13 +7,13 @@ import re
 import sys
 from datetime import UTC, datetime, timedelta
 from statistics import mean
-from urllib.parse import urlparse
 
 import requests
 import yaml
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+data = {}
 pass_or_fail_dashboard_icons = {"pass": "&#x1F49A;", "fail": "&#x1F534;"}
 reminder_text_common = "This ticket was set to **{priority}** priority but was not updated [within the SLO period]({url})."
 reminder_text = "Please consider picking up this ticket or just set the ticket to the next lower priority."
@@ -62,14 +62,27 @@ def initialize_dashboard_markdown_file(data):
         )
 
 
-def retry_request(method, url, data, headers, attempts=7):
+REQUEST_TIMEOUT_SECONDS = 30
+JSON_HEADERS = {"Content-Type": "application/json"}
+
+
+def http_request(method, url, body, headers, attempts=7):
     retries = Retry(
-        total=attempts, backoff_factor=2, status_forcelist=[429, 500, 502, 503, 504]
+        total=attempts,
+        backoff_factor=2,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
     )
-    http = requests.Session()
-    parsed_url = urlparse(url)
-    http.mount(f"{parsed_url.scheme}://", HTTPAdapter(max_retries=retries))
-    return http.request(method, url, data=data, headers=headers)
+    with requests.Session() as session:
+        for scheme in ("http://", "https://"):
+            session.mount(scheme, HTTPAdapter(max_retries=retries))
+        return session.request(
+            method,
+            url,
+            data=body,
+            headers=headers,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
 
 
 def json_rest(method, url, rest=None):
@@ -80,10 +93,10 @@ def json_rest(method, url, rest=None):
         sys.exit("REDMINE_API_KEY is required to be set")
     headers = {
         "User-Agent": "backlogger ({})".format(data["url"]),
-        "Content-Type": "application/json",
+        **JSON_HEADERS,
         "X-Redmine-API-Key": key,
     }
-    r = retry_request(method, url, data=text, headers=headers)
+    r = http_request(method, url, body=text, headers=headers)
     r.raise_for_status()
     return r.json() if r.text else None
 
@@ -242,7 +255,7 @@ def fetch_github_prs(repos):
     page = 1
     while True:
         url = f"https://api.github.com/search/issues?q={quote(q)}&per_page=100&page={page}"
-        r = retry_request("GET", url, data=None, headers=headers)
+        r = http_request("GET", url, body=None, headers=headers)
         r.raise_for_status()
         res_json = r.json()
         items = res_json.get("items", [])
@@ -537,13 +550,23 @@ def trigger_webhook(state, bad_queries):
         msg = None
         if broken_queries:
             msg = ":red_circle: Some queries are exceeding limits:"
-            for query in new_bad_queries:
+            for query in sorted(new_bad_queries):
                 qd = bad_queries[query]
                 msg += f"\n• {query} (Issue count {qd['issue_count']} exceeding limit of [{qd['limits']}])"
         elif fixed_queries and not new_bad_queries:
             msg = ":green_heart: All queries within limits again!"
         if msg and os.environ.get("WEBHOOK_URL"):
-            requests.post(os.environ["WEBHOOK_URL"], json={"msg": msg})
+            try:
+                response = http_request(
+                    "POST",
+                    os.environ["WEBHOOK_URL"],
+                    body=json.dumps({"msg": msg}),
+                    headers=JSON_HEADERS,
+                    attempts=2,
+                )
+                response.raise_for_status()
+            except requests.RequestException as e:
+                sys.stderr.write(f"Webhook notification failed: {type(e).__name__}\n")
 
 
 if __name__ == "__main__":
