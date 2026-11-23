@@ -11,6 +11,8 @@ on:
       - closed
     branches:
       - "**"
+permissions:
+  contents: read
 jobs:
   backlogger_preview_build:
     runs-on: ubuntu-latest
