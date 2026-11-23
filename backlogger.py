@@ -63,7 +63,9 @@ def initialize_dashboard_markdown_file(data):
 
 
 REQUEST_TIMEOUT_SECONDS = 30
+HTTP_ATTEMPTS = 7
 JSON_HEADERS = {"Content-Type": "application/json"}
+_sessions = {}
 QUERY_ERRORS = (
     requests.RequestException,
     KeyError,
@@ -73,23 +75,29 @@ QUERY_ERRORS = (
 )
 
 
-def http_request(method, url, body, headers, attempts=7):
-    retries = Retry(
-        total=attempts,
-        backoff_factor=2,
-        status_forcelist=[429, 500, 502, 503, 504],
-        allowed_methods=["GET"],
-    )
-    with requests.Session() as session:
+def http_session(attempts=HTTP_ATTEMPTS):
+    if attempts not in _sessions:
+        retries = Retry(
+            total=attempts,
+            backoff_factor=2,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"],
+        )
+        session = requests.Session()
         for scheme in ("http://", "https://"):
             session.mount(scheme, HTTPAdapter(max_retries=retries))
-        return session.request(
-            method,
-            url,
-            data=body,
-            headers=headers,
-            timeout=REQUEST_TIMEOUT_SECONDS,
-        )
+        _sessions[attempts] = session
+    return _sessions[attempts]
+
+
+def http_request(method, url, body, headers, attempts=HTTP_ATTEMPTS):
+    return http_session(attempts).request(
+        method,
+        url,
+        data=body,
+        headers=headers,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
 
 
 def json_rest(method, url, rest=None):

@@ -710,21 +710,34 @@ class TestOutput(unittest.TestCase):
 
     @patch("backlogger.requests.Session")
     def test_http_request_passes_timeout(self, mock_session):
-        session = mock_session.return_value.__enter__.return_value
-        backlogger.http_request(
-            "GET", "https://example.com/issues.json", body=None, headers={}
-        )
+        session = mock_session.return_value
+        with patch.object(backlogger, "_sessions", {}):
+            backlogger.http_request(
+                "GET", "https://example.com/issues.json", body=None, headers={}
+            )
         self.assertEqual(
             session.request.call_args.kwargs["timeout"],
             backlogger.REQUEST_TIMEOUT_SECONDS,
         )
 
     @patch("backlogger.requests.Session")
+    def test_http_request_reuses_one_session(self, mock_session):
+        with patch.object(backlogger, "_sessions", {}):
+            backlogger.http_request(
+                "GET", "https://example.com/one", body=None, headers={}
+            )
+            backlogger.http_request(
+                "GET", "https://example.com/two", body=None, headers={}
+            )
+        mock_session.assert_called_once()
+
+    @patch("backlogger.requests.Session")
     def test_http_request_retries_status_errors_only_for_get(self, mock_session):
-        session = mock_session.return_value.__enter__.return_value
-        backlogger.http_request(
-            "PUT", "https://example.com/issues/1.json", body="{}", headers={}
-        )
+        session = mock_session.return_value
+        with patch.object(backlogger, "_sessions", {}):
+            backlogger.http_request(
+                "PUT", "https://example.com/issues/1.json", body="{}", headers={}
+            )
         mounted = session.mount.call_args_list
         self.assertEqual([c.args[0] for c in mounted], ["http://", "https://"])
         for c in mounted:
