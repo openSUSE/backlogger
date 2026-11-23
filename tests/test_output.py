@@ -267,6 +267,31 @@ class TestOutput(unittest.TestCase):
         conf.update(kwargs)
         return conf
 
+    @patch("backlogger.http_request")
+    def test_github_rate_limit_is_reported(self, mock_http_request):
+        reset = 1763827200
+        mock_http_request.return_value = MagicMock(
+            status_code=403,
+            headers={"x-ratelimit-remaining": "0", "x-ratelimit-reset": str(reset)},
+        )
+        with self.assertRaises(requests.HTTPError) as cm:
+            backlogger.fetch_github_prs(["os-autoinst/openQA"])
+        self.assertEqual(
+            str(cm.exception),
+            "GitHub API rate limit exhausted, resets at "
+            f"{datetime.fromtimestamp(reset, UTC).isoformat()}",
+        )
+
+    @patch("backlogger.http_request")
+    def test_github_fetch_succeeds_when_rate_limit_is_spent(self, mock_http_request):
+        response = mock_http_request.return_value
+        response.status_code = 200
+        response.headers = {"x-ratelimit-remaining": "0"}
+        response.json.return_value = {"items": [{"html_url": "u"}], "total_count": 1}
+        self.assertEqual(
+            backlogger.fetch_github_prs(["os-autoinst/openQA"]), [{"html_url": "u"}]
+        )
+
     @patch("backlogger.fetch_github_prs")
     def test_github_fetch_failure_is_reported(self, mock_fetch):
         mock_fetch.side_effect = requests.ConnectionError("github timeout")

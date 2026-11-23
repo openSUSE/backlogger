@@ -260,6 +260,19 @@ def make_github_search_url(repos, stale_days=0):
     return "https://github.com/pulls?q=" + quote(" ".join(query_parts))
 
 
+def rate_limit_error(response):
+    if response.status_code != 403:
+        return None
+    if response.headers.get("x-ratelimit-remaining") != "0":
+        return None
+    reset = response.headers.get("x-ratelimit-reset", "")
+    if reset.isdigit():
+        resets_at = datetime.fromtimestamp(int(reset), UTC).isoformat()
+    else:
+        resets_at = "an unknown time"
+    return f"GitHub API rate limit exhausted, resets at {resets_at}"
+
+
 def fetch_github_prs(repos):
     from urllib.parse import quote
 
@@ -277,6 +290,9 @@ def fetch_github_prs(repos):
     while True:
         url = f"https://api.github.com/search/issues?q={quote(q)}&per_page=100&page={page}"
         r = http_request("GET", url, body=None, headers=headers)
+        limit_error = rate_limit_error(r)
+        if limit_error:
+            raise requests.HTTPError(limit_error, response=r)
         r.raise_for_status()
         res_json = r.json()
         items = res_json.get("items", [])
