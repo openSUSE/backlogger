@@ -1,5 +1,5 @@
 ---
-name: Backlog Limits Checker Preview
+name: Backlog Limits Checker Dashboard
 # yamllint disable-line rule:truthy
 on:
   push:
