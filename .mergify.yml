@@ -12,8 +12,6 @@ pull_request_rules:
           - linear-history
       - "#approved-reviews-by>=2"
       - "#changes-requested-reviews-by=0"
-      # https://docs.mergify.com/configuration/conditions/#require-all-requested-reviews-to-be-approved
-      - "#review-requested=0"
     actions: &merge
       merge:
         method: fast-forward
@@ -22,12 +20,27 @@ pull_request_rules:
       - and: *base_checks
       - label=merge-fast
     actions: *merge
-  - name: automatic merge for dependabot updates
+  - name: automatic merge for dependabot updates that only bump dependencies
     conditions:
       - and: *base_checks
-      - author=dependabot[bot]
+      - and: &bot_gate
+          - author=dependabot[bot]
+          - "#changes-requested-reviews-by=0"
       - "#commits-behind=0"
-    actions: *merge
+      # A commit pushed on top of the bot's own is a code change, not a bump
+      - "#commits=1"
+      # A bump only writes these paths; anything else needs review
+      - -files~=^(?!(\.github/workflows/[^/]+\.ya?ml)$).+
+    actions: &bump_merge
+      merge:
+        method: fast-forward
+  - name: require review for other dependabot updates
+    conditions:
+      - and: *base_checks
+      - and: *bot_gate
+      - "#commits-behind=0"
+      - "#approved-reviews-by>=1"
+    actions: *bump_merge
   # dependabot only rebases on conflicts, not when merely behind main
   - name: rebase green dependabot updates behind main
     conditions:
